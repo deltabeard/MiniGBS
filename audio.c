@@ -489,10 +489,6 @@ void audio_write(uint16_t addr, uint8_t val){
 		printf("Audio write: %4x <- %2x\n", addr, val);
 	}
 
-	if(!cfg.subdued && mem[addr] != val){
-		ui_regs_set(addr, audio_rate / 8);
-	}
-
 	int i = (addr - 0xFF10)/5;
 
 	switch(addr){

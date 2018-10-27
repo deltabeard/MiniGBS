@@ -627,12 +627,6 @@ uint64_t get_time(void){
 	return (ts.tv_sec * 1000000UL) + (ts.tv_nsec / 1000UL);
 }
 
-void change_speed(float amt){
-	cfg.speed = MAX(0.1f, MIN(2.0f, cfg.speed + amt));
-	ui_msg_set("Speed: %d%%\n", (int)roundf(100.0f * cfg.speed));
-	audio_update_rate();
-}
-
 static void fd_clear(int fd){
 	uint64_t blah;
 	ssize_t ret;
@@ -777,8 +771,6 @@ int main(int argc, char** argv){
 		0xac, 0xdd, 0xda, 0x48
 	};
 
-	ui_init();
-
 	mem[0xff06] = h.tma;
 	mem[0xff07] = h.tac;
 
@@ -857,7 +849,6 @@ restart:
 			regs.sp -= 2;
 
 			audio_update();
-			ui_redraw(&h);
 
 			fds[0].revents = 0;
 			eventfd_write(evfd_audio_ready, 1);
@@ -878,33 +869,27 @@ restart:
 				case '3':
 				case '4': {
 					bool muted = audio_mute(key - '0', -1);
-					ui_msg_set("Channel %c %smuted\n", key, muted ? "" : "un");
 				} break;
 
 				case 'n':
 				case KEY_RIGHT:
 					cfg.song_no = (cfg.song_no + 1) % h.song_count;
-					ui_msg_set("Next\n");
 					goto restart;
 
 				case 'p':
 				case KEY_LEFT:
 					cfg.song_no = (h.song_count + cfg.song_no - 1) % h.song_count;
-					ui_msg_set("Previous\n");
 					goto restart;
 
 				case 'r':
 				case KEY_UP:
-					ui_msg_set("Replay\n");
 					goto restart;
 
 				case 'c':
-					cfg.ui_mode = (cfg.ui_mode == UI_MODE_CHART) ? UI_MODE_VOLUME : UI_MODE_CHART;
 					erase();
 					break;
 
 				case 'v':
-					cfg.ui_mode = (cfg.ui_mode == UI_MODE_VOLUME) ? UI_MODE_REGISTERS : UI_MODE_VOLUME;
 					erase();
 					break;
 
@@ -912,7 +897,6 @@ restart:
 				case KEY_DOWN:
 					paused = !paused;
 					audio_pause(paused);
-					ui_msg_set("%s\n", paused ? "Paused" : "Resumed");
 					break;
 
 				case KEY_RESIZE:
@@ -923,25 +907,11 @@ restart:
 				case '=':
 				case '+':
 					cfg.volume = MIN(1.0f, cfg.volume + 0.05f);
-					ui_msg_set("Volume: %d%%\n", (int)roundf(100.0f * cfg.volume));
 					break;
 
 				case '-':
 				case '_':
 					cfg.volume = MAX(0.0f, cfg.volume - 0.05f);
-					ui_msg_set("Volume: %d%%\n", (int)roundf(100.0f * cfg.volume));
-					break;
-
-				case '[':
-					change_speed(-0.05);
-					break;
-
-				case ']':
-					change_speed(0.05);
-					break;
-
-				case KEY_BACKSPACE:
-					change_speed(1.0f - cfg.speed);
 					break;
 
 				case 12: // CTRL-L
@@ -964,7 +934,6 @@ restart:
 	}
 
 end:
-	ui_quit();
 
 	return 0;
 }

@@ -1,6 +1,6 @@
-SRC     := minigbs.c debug.c audio.c ui.c
+SRC     := minigbs.c debug.c audio.c
 CFLAGS  := -g -O0 -D_GNU_SOURCE -std=gnu99
-LDFLAGS := -lncursesw -lSDL2 -lm -ltinfo
+LDFLAGS := -lSDL2 -lm -ltinfo
 
 minigbs: $(SRC) minigbs.h
 	$(CC) $(CFLAGS) $(SRC) -o $@ $(LDFLAGS)
