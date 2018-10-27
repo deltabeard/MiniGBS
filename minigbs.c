@@ -784,12 +784,8 @@ int main(int argc, char** argv){
 	sigemptyset (&sigmask);
 	sigaddset   (&sigmask, SIGWINCH);
 
-	int sigfd = signalfd(-1, &sigmask, 0);
-
 	struct pollfd fds[] = {
 		{ evfd_audio_request, POLLIN },
-		{ STDIN_FILENO      , POLLIN },
-		{ sigfd             , POLLIN },
 	};
 
 	audio_init();
@@ -827,7 +823,8 @@ restart:
 	paused = false;
 	audio_pause(false);
 
-	while(1){
+	while(1)
+	{
 		int n = poll(fds, countof(fds), -1);
 		if(n == -1){
 			perror("poll");
@@ -853,87 +850,8 @@ restart:
 			fds[0].revents = 0;
 			eventfd_write(evfd_audio_ready, 1);
 		}
-
-		if(fds[1].revents & POLLIN){
-
-			int key;
-			switch((key = getch())){
-
-				case 27: // Escape
-					if(getch() != -1) break;
-				case 'q':
-					goto end;
-
-				case '1':
-				case '2':
-				case '3':
-				case '4': {
-					bool muted = audio_mute(key - '0', -1);
-				} break;
-
-				case 'n':
-				case KEY_RIGHT:
-					cfg.song_no = (cfg.song_no + 1) % h.song_count;
-					goto restart;
-
-				case 'p':
-				case KEY_LEFT:
-					cfg.song_no = (h.song_count + cfg.song_no - 1) % h.song_count;
-					goto restart;
-
-				case 'r':
-				case KEY_UP:
-					goto restart;
-
-				case 'c':
-					erase();
-					break;
-
-				case 'v':
-					erase();
-					break;
-
-				case ' ':
-				case KEY_DOWN:
-					paused = !paused;
-					audio_pause(paused);
-					break;
-
-				case KEY_RESIZE:
-					getmaxyx(stdscr, cfg.win_h, cfg.win_w);
-					clear();
-					break;
-
-				case '=':
-				case '+':
-					cfg.volume = MIN(1.0f, cfg.volume + 0.05f);
-					break;
-
-				case '-':
-				case '_':
-					cfg.volume = MAX(0.0f, cfg.volume - 0.05f);
-					break;
-
-				case 12: // CTRL-L
-					clear();
-					break;
-
-				default:
-					break;
-			}
-
-			fds[1].revents = 0;
-		}
-
-		if(fds[2].revents & POLLIN){
-			while(getch() != KEY_RESIZE);
-			getmaxyx(stdscr, cfg.win_h, cfg.win_w);
-			clear();
-			fds[2].revents = 0;
-		}
 	}
 
 end:
-
 	return 0;
 }
