@@ -20,13 +20,6 @@ void audio_update_rate (void);
 void audio_get_notes   (uint16_t[static 4]);
 void audio_get_vol     (uint8_t vol[static 8]);
 
-void ui_init      (void);
-void ui_msg_set   (const char* fmt, ...);
-void ui_regs_set  (uint16_t addr, int val);
-void ui_chart_set (uint16_t[static 3]);
-void ui_redraw    (struct GBSHeader*);
-void ui_quit      (void);
-
 struct GBSHeader {
 	char     id[3];
 	uint8_t  version;
@@ -60,14 +53,6 @@ struct {
 	uint16_t sp, pc;
 } regs;
 
-enum UIMode {
-	UI_MODE_REGISTERS,
-	UI_MODE_VOLUME,
-	UI_MODE_CHART,
-
-	UI_MODE_COUNT,
-};
-
 struct Config {
 	bool monochrome;
 	bool hide_ui;
@@ -77,8 +62,6 @@ struct Config {
 
 	float volume; // 0.0f - 1.0f
 	float speed;  // 0.0f - 1.0f
-
-	enum UIMode ui_mode;
 
 	int win_w, win_h;
 };
