@@ -668,18 +668,15 @@ int main(int argc, char** argv){
 	mprotect(mem + 0x10000, 0x1000, PROT_NONE);
 
 	fseek(f, 0, SEEK_END);
-	long fsz = ftell(f) - 0x70;
 	fseek(f, 0x70, SEEK_SET);
 
 	int bno = h.load_addr / 0x4000;
-	int off = h.load_addr % 0x4000;
 
 	while(1){
 		uint8_t* page = mmap(NULL, 0x4000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 		assert(page != MAP_FAILED);
 		banks[bno] = page;
 
-		size_t n = fread(page + off, 1, 0x4000 - off, f);
 		if(feof(f)){
 			break;
 		} else if(ferror(f)){
@@ -687,7 +684,6 @@ int main(int argc, char** argv){
 			break;
 		}
 
-		off = 0;
 		if(++bno >= 32){
 			puts("Too many banks...");
 			exit(1);
@@ -730,9 +726,6 @@ int main(int argc, char** argv){
 	// hack to avoid ALSA warnings breaking the UI
 	fclose(stderr);
 
-	bool paused;
-
-restart:
 	audio_reset();
 	clear();
 
@@ -757,7 +750,6 @@ restart:
 	}
 	memcpy(mem + 0xff30, wave_init, 16);
 
-	paused = false;
 	audio_pause(false);
 
 	while(1)
@@ -785,6 +777,5 @@ restart:
 		}
 	}
 
-end:
 	return 0;
 }
