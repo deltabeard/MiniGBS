@@ -22,12 +22,9 @@ static uint8_t* banks[32];
 static struct GBSHeader h;
 
 void bank_switch(int which){
-	if(cfg.debug_mode) printf("Bank switching to %d.\n", which);
-
 	// allowing bank switch to 0 seems to break some games
 	if(which > 0 && which < 32 && banks[which]){
 		memcpy(mem + 0x4000, banks[which], 0x4000);
-		if(cfg.debug_mode) puts("Bank switch success.");
 	}
 }
 
@@ -37,23 +34,10 @@ static inline void mem_write(uint16_t addr, uint8_t val){
 	} else if(addr >= 0xFF10 && addr <= 0xFF40){
 		audio_write(addr, val);
 	} else if(addr < 0x8000){
-		if(cfg.debug_mode){
-			printf("rom write?: [%4x] <- [%2x]\n", addr, val);
-		}
 	} else if(addr == 0xFF06 || addr == 0xFF07){
 		mem[addr] = val;
 		audio_update_rate();
 	} else {
-		if(cfg.debug_mode){
-			switch(addr){
-				case 0xFF04: printf("DIV write: %2x\n", val); break;
-				case 0xFF05: printf("TIMA write: %2x\n", val); break;
-				case 0xFF0F: printf("IF write: %2x\n", val); break;
-				case 0xFF41: printf("STAT: %2x\n", val); break;
-				case 0xFF46: printf("DMA: %2x\n", val); break;
-				case 0xFFFF: printf("IE: %2x\n", val); break;
-			}
-		}
 		mem[addr] = val;
 	}
 }
@@ -73,19 +57,6 @@ static inline uint8_t mem_read(uint16_t addr){
 		val |= ortab[addr - 0xFF10];
 	}
 
-	if(cfg.debug_mode){
-		switch(addr){
-			case 0xFF10 ... 0xFF40: printf("Audio read: [%4x] = [%2x]\n", addr, val); break;
-			case 0xFF04: printf("DIV read: %2x\n", val); break;
-			case 0xFF05: printf("TIMA read: %2x\n", val); break;
-			case 0xFF06: printf("TMA read: %2x\n", val); break;
-			case 0xFF07: printf("TAC read: %2x\n", val); break;
-			case 0xFF0F: printf("IF read: %2x\n", val); break;
-			case 0xFF41: printf("STAT read: %2x\n", val); break;
-			case 0xFF46: printf("DMA read: %2x\n", val); break;
-			case 0xFFFF: printf("IE read: %2x\n", val); break;
-		}
-	}
 	return val;
 }
 
@@ -98,12 +69,6 @@ bool cpu_step(void){
 
 	bool is_ret = false;
 	unsigned cycles = 0;
-
-	if(cfg.debug_mode){
-		printf("[PC:%4x] [SP:%4x] [AF:%4x] [BC:%4x] [DE:%4x] [HL:%4x] [%2x] ",
-		       regs.pc, regs.sp, regs.af, regs.bc, regs.de, regs.hl, op);
-		debug_dump(mem + regs.pc);
-	}
 
 #define OP(x) &&op_##x
 #define ALUY (void*)(1)
@@ -614,7 +579,6 @@ void usage(const char* argv0, FILE* out){
 	fprintf(out,
 	        "Usage: %s [-dhmqs] file [song index]\n\n"
 			"  -h, Output this info to stdout.\n\n"
-			"  -d, Debug mode   : Dump a cpu trace to stdout, implies -q.\n"
 			"  -m, Mono mode    : Disable colors.\n"
 			"  -q, Quiet mode   : Disable UI.\n"
 			"  -s, Subdued mode : Don't flash/embolden changed registers.\n\n",
@@ -643,9 +607,6 @@ int main(int argc, char** argv){
 	int opt;
 	while((opt = getopt(argc, argv, "dhmqs")) != -1){
 		switch(opt){
-			case 'd':
-				cfg.hide_ui = cfg.debug_mode = true;
-				break;
 			case 'h':
 				usage(prog, stdout);
 				return 0;
@@ -699,22 +660,6 @@ int main(int argc, char** argv){
 		return 1;
 	}
 
-	if(cfg.debug_mode){
-		printf("id   : %.3s\n", h.id);
-		printf("ver  : %d\n", h.version);
-		printf("count: %d\n", h.song_count);
-		printf("start: %d\n", h.start_song);
-		printf("load : %x\n", h.load_addr);
-		printf("init : %x\n", h.init_addr);
-		printf("play : %x\n", h.play_addr);
-		printf("sp   : %x\n", h.sp);
-		printf("tma  : %d\n", h.tma);
-		printf("tac  : %d\n", h.tac);
-		printf("title: %.32s\n", h.title);
-		printf("authr: %.32s\n", h.author);
-		printf("copyr: %.32s\n", h.copyright);
-	}
-
 	mem = mmap(NULL, 0x12000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	assert(mem != MAP_FAILED);
 	mem += 0x1000;
@@ -726,10 +671,6 @@ int main(int argc, char** argv){
 	long fsz = ftell(f) - 0x70;
 	fseek(f, 0x70, SEEK_SET);
 
-	if(cfg.debug_mode){
-		puts("rom banks:");
-	}
-
 	int bno = h.load_addr / 0x4000;
 	int off = h.load_addr % 0x4000;
 
@@ -739,10 +680,6 @@ int main(int argc, char** argv){
 		banks[bno] = page;
 
 		size_t n = fread(page + off, 1, 0x4000 - off, f);
-		if(cfg.debug_mode){
-			printf("Bank %d: %zu\n", bno, n);
-		}
-
 		if(feof(f)){
 			break;
 		} else if(ferror(f)){
@@ -836,10 +773,6 @@ restart:
 
 			while(regs.sp != h.sp){
 				cpu_step();
-			}
-
-			if(cfg.debug_mode){
-				puts("-------------------------");
 			}
 
 			regs.pc = h.play_addr;

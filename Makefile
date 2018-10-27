@@ -1,4 +1,4 @@
-SRC     := minigbs.c debug.c audio.c
+SRC     := minigbs.c audio.c
 CFLAGS  := -g -O0 -D_GNU_SOURCE -std=gnu99
 LDFLAGS := -lSDL2 -lm -ltinfo
 

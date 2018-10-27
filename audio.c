@@ -347,6 +347,8 @@ static void audio_callback(void* ptr, uint8_t* data, int len){
 			uint64_t val = 1;
 
 			eventfd_write(evfd_audio_request, val);
+
+			/* TODO: Remove GNU macro. */
 			TEMP_FAILURE_RETRY(eventfd_read(evfd_audio_ready, &val));
 
 			if(is_resetting)
@@ -382,8 +384,6 @@ void audio_init(void){
 	if((audio = SDL_OpenAudioDevice(NULL, 0, &want, &got, 0)) == 0){
 		printf("OpenAudio failed: %s.\n", SDL_GetError());
 		exit(1);
-	} else if(cfg.debug_mode){
-		printf("Got audio: freq=%d, samples=%d, format=%d.\n", got.freq, got.samples, got.format);
 	}
 
 	logbase = log(1.059463094f);
@@ -426,10 +426,6 @@ void audio_update_rate(void){
 
 	audio_rate *= cfg.speed;
 
-	if(cfg.debug_mode){
-		printf("Audio rate changed: %.4f\n", audio_rate);
-	}
-
 	free(samples);
 	nsamples  = (int)(FREQ / audio_rate) * 2;
 	samples   = calloc(nsamples, sizeof(float));
@@ -438,11 +434,6 @@ void audio_update_rate(void){
 
 void chan_trigger(int i){
 	struct chan* c = chans + i;
-
-	if(cfg.debug_mode){
-		static const char* cname[] = { "sq1", "sq2", "wave", "noise" };
-		printf("(trigger %s)\n", cname[i]);
-	}
 
 	chan_enable(i, 1);
 	c->volume = c->volume_init;
@@ -485,10 +476,6 @@ void chan_trigger(int i){
 
 void audio_write(uint16_t addr, uint8_t val){
 
-	if(cfg.debug_mode){
-		printf("Audio write: %4x <- %2x\n", addr, val);
-	}
-
 	int i = (addr - 0xFF10)/5;
 
 	switch(addr){
@@ -504,14 +491,11 @@ void audio_write(uint16_t addr, uint8_t val){
 
 				if((chans[i].env.step == 0 && chans[i].env.inc != 0)){
 					if(val & 0x08){
-						if(cfg.debug_mode) puts("(zombie vol++)");
 						chans[i].volume++;
 					} else {
-						if(cfg.debug_mode) puts("(zombie vol+=2)");
 						chans[i].volume+=2;
 					}
 				} else {
-					if(cfg.debug_mode) puts("(zombie swap)");
 					chans[i].volume = 16 - chans[i].volume;
 				}
 

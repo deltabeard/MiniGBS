@@ -10,8 +10,6 @@
 struct GBSHeader;
 struct Config;
 
-void debug_dump (uint8_t* op);
-
 void audio_init        (void);
 void audio_update      (void);
 void audio_reset       (void);
@@ -71,7 +69,6 @@ enum UIMode {
 };
 
 struct Config {
-	bool debug_mode;
 	bool monochrome;
 	bool hide_ui;
 	bool subdued;
