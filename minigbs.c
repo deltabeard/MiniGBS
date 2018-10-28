@@ -12,14 +12,16 @@ uint8_t* mem;
 static uint8_t* banks[32];
 static struct GBSHeader h;
 
-void bank_switch(int which){
+void bank_switch(int which)
+{
 	// allowing bank switch to 0 seems to break some games
 	if(which > 0 && which < 32 && banks[which]){
 		memcpy(mem + 0x4000, banks[which], 0x4000);
 	}
 }
 
-static inline void mem_write(uint16_t addr, uint8_t val){
+static inline void mem_write(uint16_t addr, uint8_t val)
+{
 	if(addr >= 0x2000 && addr < 0x4000){
 		bank_switch(val);
 	} else if(addr >= 0xFF10 && addr <= 0xFF40){
@@ -579,7 +581,8 @@ void process_cpu(void)
 	audio_update();
 }
 
-int main(int argc, char** argv){
+int main(int argc, char** argv)
+{
 	char* prog = argv[0];
 
 	int opt;
@@ -651,7 +654,8 @@ int main(int argc, char** argv){
 	int bno = h.load_addr / 0x4000;
 	int off = h.load_addr % 0x4000;
 
-	while(1){
+	while(1)
+	{
 		uint8_t* page;
 
 		if((page = mmap(NULL, 0x4000, PROT_READ | PROT_WRITE,
@@ -712,9 +716,9 @@ int main(int argc, char** argv){
 	mem[0xff07] = h.tac;
 
 	/* Initialise registers. */
-	for(int i = 0; i < 23; ++i){
+	for(int i = 0; i < 23; ++i)
 		mem_write(0xFF10 + i, regs_init[i]);
-	}
+
 	memcpy(mem + 0xff30, wave_init, 16);
 
 	audio_init();
