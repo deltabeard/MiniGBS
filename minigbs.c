@@ -698,9 +698,6 @@ int main(int argc, char** argv){
 	mem[0xff06] = h.tma;
 	mem[0xff07] = h.tac;
 
-	cfg.volume = 1.0f;
-	cfg.speed  = 1.0f;
-
 	evfd_audio_request = eventfd(0, EFD_NONBLOCK);
 	evfd_audio_ready   = eventfd(0, EFD_SEMAPHORE);
 

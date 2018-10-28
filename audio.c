@@ -301,10 +301,6 @@ void audio_update(void){
 	update_wave();
 	update_noise();
 
-	for(size_t i = 0; i < nsamples; ++i){
-		samples[i] *= cfg.volume;
-	}
-
 	sample_ptr = samples + nsamples;
 }
 
@@ -423,8 +419,6 @@ void audio_update_rate(void){
 		audio_rate = rates[tac & 0x03] / (float)(256 - tma);
 		if(tac & 0x80) audio_rate *= 2.0f;
 	}
-
-	audio_rate *= cfg.speed;
 
 	free(samples);
 	nsamples  = (int)(FREQ / audio_rate) * 2;

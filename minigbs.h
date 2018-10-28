@@ -55,11 +55,6 @@ struct {
 
 struct Config {
 	int song_no;
-
-	float volume; // 0.0f - 1.0f
-	float speed;  // 0.0f - 1.0f
-
-	int win_w, win_h;
 };
 
 extern struct Config cfg;
