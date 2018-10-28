@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <math.h>
 #include <stdlib.h>
 #include "minigbs.h"
@@ -6,7 +7,6 @@
 #error "Some of the bitfield / casting used in here assumes little endian :("
 #endif
 
-struct Config cfg;
 uint8_t* mem;
 
 static uint8_t* banks[32];
@@ -565,8 +565,8 @@ end:;
 
 void usage(const char* argv0, FILE* out){
 	fprintf(out,
-	        "Usage: %s [-h] file [song index]\n\n"
-			"  -h, Output this info to stdout.\n\n",
+	        "Usage: %s [-h] file [song index]\n"
+			"  -h, Output this info to stdout.\n",
 			argv0);
 }
 
@@ -583,57 +583,47 @@ void process_cpu(void)
 
 int main(int argc, char** argv)
 {
-	char* prog = argv[0];
+	FILE *f;
 
-	int opt;
-	while((opt = getopt(argc, argv, "dhmqs")) != -1){
-		switch(opt){
-			case 'h':
-				usage(prog, stdout);
-				return 0;
-			default:
-				usage(prog, stderr);
-				return 1;
-		}
+	if(argc != 2 && argc != 3)
+	{
+		fprintf(stderr, "Usage: %s file [song index]\n", argv[0]);
+		exit(EXIT_FAILURE);
 	}
 
-	if(optind >= argc){
-		fprintf(stderr, "Missing file argument.\n\n");
-		usage(argv[0], stderr);
-		return 1;
+	f = fopen(argv[1], "r");
+	if(!f)
+	{
+		fprintf(stderr, "Error opening file: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
-	argc -= (optind-1);
-	argv += (optind-1);
-
-	FILE* f = fopen(argv[1], "r");
-	if(!f){
-		fprintf(stderr, "Error opening file '%s': %m\n", argv[1]);
-		return 1;
+	if(fread(&h, sizeof(h), 1, f) != 1)
+	{
+		fprintf(stderr, "Error reading file: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
-	if(fread(&h, sizeof(h), 1, f) != 1){
-		return 1;
+	if(strncmp(h.id, "GBS", 3) != 0)
+	{
+		fprintf(stderr, "Error: Not a GBS file.\n");
+		exit(EXIT_FAILURE);
 	}
 
-	if(strncmp(h.id, "GBS", 3) != 0){
-		fprintf(stderr, "That doesn't look like a GBS file.\n");
-		return 1;
+	if(h.version != 1)
+	{
+		fprintf(stderr, "Error: Only GBS version 1 is supported.\n");
+		exit(EXIT_FAILURE);
 	}
 
-	if(h.version != 1){
-		fprintf(stderr, "This GBS file is version %d, "
-				"I can only handle version 1 :(\n",
-				h.version);
-		return 1;
-	}
-
-	cfg.song_no = argc > 2 ? atoi(argv[2]) : MAX(0, h.start_song - 1);
-	if(cfg.song_no >= h.song_count){
-		fprintf(stderr, "The file says it has %d tracks, "
-				"index %d is out of range.\n",
-				h.song_count, cfg.song_no);
-		return 1;
+	unsigned int song_no = argc > 2 ? atoi(argv[2]) : MAX(0, h.start_song - 1);
+	if(song_no >= h.song_count)
+	{
+		fprintf(stderr,
+				"Error: The selected song index of %d is out of range. "
+				"This file has %d songs.\n",
+				song_no, h.song_count);
+		exit(EXIT_FAILURE);
 	}
 
 	if((mem = malloc(0x12000)) == NULL)
@@ -707,7 +697,7 @@ int main(int argc, char** argv)
 
 	regs.sp = h.sp - 2;
 	regs.pc = h.init_addr;
-	regs.a = cfg.song_no;
+	regs.a = song_no;
 
 	mem[0xffff] = 1; // IE
 	mem[0xff06] = h.tma;
@@ -730,5 +720,5 @@ int main(int argc, char** argv)
 		}
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }

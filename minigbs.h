@@ -55,7 +55,6 @@ struct Config {
 	int song_no;
 };
 
-extern struct Config cfg;
 extern uint8_t* mem;
 
 #define MAX(a, b) ({ typeof(a) _a = (a); typeof(b) _b = (b); _a >  _b ? _a : _b; })
