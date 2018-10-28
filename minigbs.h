@@ -1,11 +1,9 @@
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <unistd.h>
-#include <ncurses.h>
-#include <sys/eventfd.h>
 
 struct GBSHeader;
 struct Config;
@@ -59,9 +57,6 @@ struct Config {
 
 extern struct Config cfg;
 extern uint8_t* mem;
-
-extern int evfd_audio_request;
-extern int evfd_audio_ready;
 
 #define MAX(a, b) ({ typeof(a) _a = (a); typeof(b) _b = (b); _a >  _b ? _a : _b; })
 #define MIN(a, b) ({ typeof(a) _a = (a); typeof(b) _b = (b); _a <= _b ? _a : _b; })

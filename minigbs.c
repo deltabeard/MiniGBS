@@ -1,5 +1,5 @@
 #include <math.h>
-#include <sys/mman.h>
+#include <stdlib.h>
 #include "minigbs.h"
 
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
@@ -636,17 +636,13 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	if((mem = mmap(NULL, 0x12000, PROT_READ | PROT_WRITE,
-					MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED)
+	if((mem = malloc(0x12000)) == NULL)
 	{
-		puts("mem = mmap() failure");
+		printf("%d: malloc failure", __LINE__);
 		exit(EXIT_FAILURE);
 	}
 
 	mem += 0x1000;
-
-	mprotect(mem - 0x1000 , 0x1000, PROT_NONE);
-	mprotect(mem + 0x10000, 0x1000, PROT_NONE);
 
 	fseek(f, 0, SEEK_END);
 	fseek(f, 0x70, SEEK_SET);
@@ -658,10 +654,9 @@ int main(int argc, char** argv)
 	{
 		uint8_t* page;
 
-		if((page = mmap(NULL, 0x4000, PROT_READ | PROT_WRITE,
-						MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED)
+		if((page = malloc(0x4000)) == NULL)
 		{
-			puts("page = mmap() failure");
+			printf("%d: malloc failure", __LINE__);
 			exit(EXIT_FAILURE);
 		}
 
@@ -699,8 +694,11 @@ int main(int argc, char** argv)
 	mem[0xff06] = h.tma;
 	mem[0xff07] = h.tac;
 
-	if(banks[0]) memcpy(mem, banks[0], 0x4000);
-	if(banks[1]) memcpy(mem + 0x4000, banks[1], 0x4000);
+	if(banks[0])
+		memcpy(mem, banks[0], 0x4000);
+
+	if(banks[1])
+		memcpy(mem + 0x4000, banks[1], 0x4000);
 
 	memset(&regs, 0, sizeof(regs));
 	memset(mem + 0x8000, 0, 0x8000);
