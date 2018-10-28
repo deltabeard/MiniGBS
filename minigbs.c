@@ -1,11 +1,5 @@
-#include <assert.h>
 #include <math.h>
-#include <locale.h>
-#include <time.h>
-#include <poll.h>
 #include <sys/mman.h>
-#include <signal.h>
-#include <unistd.h>
 #include "minigbs.h"
 
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
@@ -579,12 +573,6 @@ void usage(const char* argv0, FILE* out){
 			argv0);
 }
 
-uint64_t get_time(void){
-	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return (ts.tv_sec * 1000000UL) + (ts.tv_nsec / 1000UL);
-}
-
 void process_cpu(void)
 {
 	while(regs.sp != h.sp)
@@ -597,7 +585,6 @@ void process_cpu(void)
 }
 
 int main(int argc, char** argv){
-	setlocale(LC_ALL, "");
 	char* prog = argv[0];
 
 	int opt;
@@ -651,9 +638,13 @@ int main(int argc, char** argv){
 		return 1;
 	}
 
-	mem = mmap(NULL, 0x12000,
-			PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	assert(mem != MAP_FAILED);
+	if((mem = mmap(NULL, 0x12000, PROT_READ | PROT_WRITE,
+					MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED)
+	{
+		puts("mem = mmap() failure");
+		exit(EXIT_FAILURE);
+	}
+
 	mem += 0x1000;
 
 	mprotect(mem - 0x1000 , 0x1000, PROT_NONE);
@@ -666,9 +657,15 @@ int main(int argc, char** argv){
 	int off = h.load_addr % 0x4000;
 
 	while(1){
-		uint8_t* page = mmap(NULL, 0x4000,
-				PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-		assert(page != MAP_FAILED);
+		uint8_t* page;
+
+		if((page = mmap(NULL, 0x4000, PROT_READ | PROT_WRITE,
+						MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED)
+		{
+			puts("page = mmap() failure");
+			exit(EXIT_FAILURE);
+		}
+
 		banks[bno] = page;
 
 		size_t n = fread(page + off, 1, 0x4000 - off, f);
