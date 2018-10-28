@@ -1,6 +1,15 @@
 #include <SDL2/SDL.h>
 #include "minigbs.h"
 
+#define ENABLE_HIPASS 1
+
+/* Calculating VSYNC. */
+#define DMG_CLOCK_FREQ		4194304.0
+#define SCREEN_REFRESH_CYCLES	70224.0
+#define VERTICAL_SYNC		(DMG_CLOCK_FREQ/SCREEN_REFRESH_CYCLES)
+
+#define FREQ 48000.0f
+
 struct chan_len_ctr {
 	int   load;
 	bool  enabled;
@@ -60,8 +69,6 @@ static struct chan {
 	uint8_t sample;
 } chans[4];
 
-#define FREQ 44100.0f
-
 static size_t nsamples;
 static float* samples;
 static float* sample_ptr;
@@ -73,9 +80,13 @@ static float vol_l, vol_r;
 static float audio_rate;
 
 float hipass(struct chan* c, float sample){
+#if ENABLE_HIPASS
 	float out = sample - c->capacitor;
 	c->capacitor = sample - out * 0.996;
 	return out;
+#else
+	return sample;
+#endif
 }
 
 void set_note_freq(struct chan* c, float freq){
@@ -84,10 +95,12 @@ void set_note_freq(struct chan* c, float freq){
 }
 
 bool chan_muted(struct chan* c){
-	return c->muted || !c->enabled || !c->powered || !(c->on_left || c->on_right) || !c->volume;
+	return c->muted || !c->enabled || !c->powered || !(c->on_left ||
+			c->on_right) || !c->volume;
 }
 
-void chan_enable(int i, bool enable){
+void chan_enable(int i, bool enable)
+{
 	chans[i].enabled = enable;
 
 	uint8_t val = (mem[0xFF26] & 0x80)
@@ -409,7 +422,7 @@ void audio_get_vol(uint8_t vol[static 8]){
 }
 
 void audio_update_rate(void){
-	audio_rate = 59.7f;
+	audio_rate = VERTICAL_SYNC;
 
 	uint8_t tma = mem[0xff06];
 	uint8_t tac = mem[0xff07];

@@ -638,17 +638,22 @@ int main(int argc, char** argv){
 	}
 
 	if(h.version != 1){
-		fprintf(stderr, "This GBS file is version %d, I can only handle version 1 :(\n", h.version);
+		fprintf(stderr, "This GBS file is version %d, "
+				"I can only handle version 1 :(\n",
+				h.version);
 		return 1;
 	}
 
 	cfg.song_no = argc > 2 ? atoi(argv[2]) : MAX(0, h.start_song - 1);
 	if(cfg.song_no >= h.song_count){
-		fprintf(stderr, "The file says it has %d tracks, index %d is out of range.\n", h.song_count, cfg.song_no);
+		fprintf(stderr, "The file says it has %d tracks, "
+				"index %d is out of range.\n",
+				h.song_count, cfg.song_no);
 		return 1;
 	}
 
-	mem = mmap(NULL, 0x12000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	mem = mmap(NULL, 0x12000,
+			PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	assert(mem != MAP_FAILED);
 	mem += 0x1000;
 
@@ -662,7 +667,8 @@ int main(int argc, char** argv){
 	int off = h.load_addr % 0x4000;
 
 	while(1){
-		uint8_t* page = mmap(NULL, 0x4000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		uint8_t* page = mmap(NULL, 0x4000,
+				PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 		assert(page != MAP_FAILED);
 		banks[bno] = page;
 

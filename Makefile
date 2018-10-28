@@ -1,9 +1,10 @@
 SRC     := minigbs.c audio.c
-CFLAGS  := -g -O0 -D_GNU_SOURCE -std=gnu99
+OPT     := -s -Ofast
+CFLAGS  := -D_GNU_SOURCE -std=gnu99 -Wall
 LDFLAGS := -lSDL2 -lm -ltinfo
 
 minigbs: $(SRC) minigbs.h
-	$(CC) $(CFLAGS) $(SRC) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(OPT) $(SRC) -o $@ $(LDFLAGS)
 
 clean:
 	$(RM) minigbs
