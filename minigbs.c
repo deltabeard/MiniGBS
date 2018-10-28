@@ -619,14 +619,12 @@ int main(int argc, char** argv)
 		exit(EXIT_FAILURE);
 	}
 
-	/* TODO: Replace magic number with definition */
-	if((mem = malloc(0x12000)) == NULL)
+	/* Allocate full Game Boy memory area. */
+	if((mem = malloc(0x10000)) == NULL)
 	{
 		printf("%d: malloc failure", __LINE__);
 		exit(EXIT_FAILURE);
 	}
-
-	mem += 0x1000;
 
 	fseek(f, 0, SEEK_END);
 	fseek(f, 0x70, SEEK_SET);
@@ -634,6 +632,7 @@ int main(int argc, char** argv)
 	int bno = h.load_addr / 0x4000;
 	int off = h.load_addr % 0x4000;
 
+	/* Read all ROM banks */
 	while(1)
 	{
 		uint8_t* page;
@@ -660,32 +659,26 @@ int main(int argc, char** argv)
 			exit(1);
 		}
 	}
+
+	/* Close input file after loading file. */
 	fclose(f);
 
-	const uint8_t regs_init[] = {
-		0x80, 0xBF, 0xF3, 0xFF, 0x3F, 0xFF, 0x3F, 0x00,
-		0xFF, 0x3F, 0x7F, 0xFF, 0x9F, 0xFF, 0x3F, 0xFF,
-		0xFF, 0x00, 0x00, 0x3F, 0x77, 0xF3, 0xF1
-	};
-
-	const uint8_t wave_init[] = {
-		0xac, 0xdd, 0xda, 0x48,
-		0x36, 0x02, 0xcf, 0x16,
-		0x2c, 0x04, 0xe5, 0x2c,
-		0xac, 0xdd, 0xda, 0x48
-	};
-
+	/* Load timer values from file. */
 	mem[0xff06] = h.tma;
 	mem[0xff07] = h.tac;
 
+	/* Copy data to ROM banks 1 and 2. */
 	if(banks[0])
 		memcpy(mem, banks[0], 0x4000);
 
 	if(banks[1])
 		memcpy(mem + 0x4000, banks[1], 0x4000);
 
-	memset(&regs, 0, sizeof(regs));
+	/* Initialise the rest of the working memory area. */
 	memset(mem + 0x8000, 0, 0x8000);
+
+	/* Initialise CPU registers. */
+	memset(&regs, 0, sizeof(regs));
 
 	memcpy(mem, mem + h.load_addr, 0x62);
 
@@ -697,11 +690,29 @@ int main(int argc, char** argv)
 	mem[0xff06] = h.tma;
 	mem[0xff07] = h.tac;
 
-	/* Initialise registers. */
-	for(int i = 0; i < 23; ++i)
-		mem_write(0xFF10 + i, regs_init[i]);
+	/* Initialise IO registers. */
+	{
+		const uint8_t regs_init[] = {
+			0x80, 0xBF, 0xF3, 0xFF, 0x3F, 0xFF, 0x3F, 0x00,
+			0xFF, 0x3F, 0x7F, 0xFF, 0x9F, 0xFF, 0x3F, 0xFF,
+			0xFF, 0x00, 0x00, 0x3F, 0x77, 0xF3, 0xF1
+		};
 
-	memcpy(mem + 0xff30, wave_init, 16);
+		for(int i = 0; i < 23; ++i)
+			mem_write(0xFF10 + i, regs_init[i]);
+	}
+
+	/* Initialise Wave Pattern RAM. */
+	{
+		const uint8_t wave_init[] = {
+			0xac, 0xdd, 0xda, 0x48,
+			0x36, 0x02, 0xcf, 0x16,
+			0x2c, 0x04, 0xe5, 0x2c,
+			0xac, 0xdd, 0xda, 0x48
+		};
+
+		memcpy(mem + 0xff30, wave_init, 16);
+	}
 
 	audio_init();
 
