@@ -716,12 +716,34 @@ int main(int argc, char** argv)
 
 	audio_init();
 
+	printf("Keys: q = Quit, n = Next, p = Previous\n");
+
 	while(1)
 	{
 		switch(getchar())
 		{
 			case 'q':
 				exit(EXIT_SUCCESS);
+
+			case 'n':
+				if(song_no < h.song_count)
+				{
+					regs.a = ++song_no;
+					regs.sp = h.sp - 2;
+					regs.pc = h.init_addr;
+					printf("Song %d of %d\n", song_no, h.song_count);
+				}
+				break;
+
+			case 'p':
+				if(song_no > 0)
+				{
+					regs.a = --song_no;
+					regs.sp = h.sp - 2;
+					regs.pc = h.init_addr;
+					printf("Song %d of %d\n", song_no, h.song_count);
+				}
+				break;
 		}
 	}
 
