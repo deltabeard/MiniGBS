@@ -312,18 +312,6 @@ void audio_update(void){
 	sample_ptr = samples + nsamples;
 }
 
-void audio_reset(void){
-	SDL_LockAudioDevice(audio);
-
-	memset(chans, 0, sizeof(chans));
-	memset(samples, 0, nsamples * sizeof(float));
-	sample_ptr = samples;
-	chans[0].val = chans[1].val = -1;
-
-	SDL_UnlockAudioDevice(audio);
-	SDL_PauseAudioDevice(audio, 0);
-}
-
 static void audio_callback(void* ptr, uint8_t* data, int len)
 {
 	len >>= 2;
@@ -352,13 +340,14 @@ void audio_init(void)
 	SDL_AudioSpec want = {
 		.freq     = FREQ,
 		.channels = 2,
-		.samples  = 512,
+		.samples  = 3000,
 		.format   = AUDIO_F32SYS,
 		.callback = audio_callback,
 	};
 
 	SDL_AudioSpec got;
-	if((audio = SDL_OpenAudioDevice(NULL, 0, &want, &got, 0)) == 0){
+	if((audio = SDL_OpenAudioDevice(NULL, 0, &want, &got, 0)) == 0)
+	{
 		printf("OpenAudio failed: %s.\n", SDL_GetError());
 		exit(1);
 	}
@@ -366,6 +355,15 @@ void audio_init(void)
 	logbase = log(1.059463094f);
 
 	audio_update_rate();
+
+	/* Initialise channels and samples. */
+	memset(chans, 0, sizeof(chans));
+	memset(samples, 0, nsamples * sizeof(float));
+	sample_ptr = samples;
+	chans[0].val = chans[1].val = -1;
+
+	/* Begin playing audio. */
+	SDL_PauseAudioDevice(audio, 0);
 }
 
 void audio_get_notes(uint16_t notes[static 4]){
@@ -387,7 +385,8 @@ void audio_get_vol(uint8_t vol[static 8]){
 	if(vol[5]) vol[5] = chans[2].sample >> (vol[5]-1);
 }
 
-void audio_update_rate(void){
+void audio_update_rate(void)
+{
 	audio_rate = VERTICAL_SYNC;
 
 	uint8_t tma = mem[0xff06];

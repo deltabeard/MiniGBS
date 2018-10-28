@@ -687,13 +687,13 @@ int main(int argc, char** argv){
 	}
 	fclose(f);
 
-	static const uint8_t regs_init[] = {
+	const uint8_t regs_init[] = {
 		0x80, 0xBF, 0xF3, 0xFF, 0x3F, 0xFF, 0x3F, 0x00,
 		0xFF, 0x3F, 0x7F, 0xFF, 0x9F, 0xFF, 0x3F, 0xFF,
-		0xFF, 0x00, 0x00, 0x3F, 0x77, 0xF3, 0xF1,
+		0xFF, 0x00, 0x00, 0x3F, 0x77, 0xF3, 0xF1
 	};
 
-	static const uint8_t wave_init[] = {
+	const uint8_t wave_init[] = {
 		0xac, 0xdd, 0xda, 0x48,
 		0x36, 0x02, 0xcf, 0x16,
 		0x2c, 0x04, 0xe5, 0x2c,
@@ -719,16 +719,18 @@ int main(int argc, char** argv){
 	mem[0xff06] = h.tma;
 	mem[0xff07] = h.tac;
 
+	/* Initialise registers. */
 	for(int i = 0; i < 23; ++i){
 		mem_write(0xFF10 + i, regs_init[i]);
 	}
 	memcpy(mem + 0xff30, wave_init, 16);
 
 	audio_init();
-	audio_reset();
 
 	while(1)
 	{
+		/* CPU processing is now done in the audio callback.
+		 * Sleeping here to reduce CPU usage. */
 		sleep(UINT16_MAX);
 	}
 
