@@ -729,9 +729,11 @@ int main(int argc, char** argv){
 
 	while(1)
 	{
-		/* CPU processing is now done in the audio callback.
-		 * Sleeping here to reduce CPU usage. */
-		sleep(UINT16_MAX);
+		switch(getchar())
+		{
+			case 'q':
+				exit(EXIT_SUCCESS);
+		}
 	}
 
 	return 0;
