@@ -577,11 +577,8 @@ end:;
 
 void usage(const char* argv0, FILE* out){
 	fprintf(out,
-	        "Usage: %s [-dhmqs] file [song index]\n\n"
-			"  -h, Output this info to stdout.\n\n"
-			"  -m, Mono mode    : Disable colors.\n"
-			"  -q, Quiet mode   : Disable UI.\n"
-			"  -s, Subdued mode : Don't flash/embolden changed registers.\n\n",
+	        "Usage: %s [-h] file [song index]\n\n"
+			"  -h, Output this info to stdout.\n\n",
 			argv0);
 }
 
@@ -610,15 +607,6 @@ int main(int argc, char** argv){
 			case 'h':
 				usage(prog, stdout);
 				return 0;
-			case 'm':
-				cfg.monochrome = true;
-				break;
-			case 'q':
-				cfg.hide_ui = true;
-				break;
-			case 's':
-				cfg.subdued = true;
-				break;
 			default:
 				usage(prog, stderr);
 				return 1;

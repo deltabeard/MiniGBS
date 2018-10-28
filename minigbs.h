@@ -54,10 +54,6 @@ struct {
 } regs;
 
 struct Config {
-	bool monochrome;
-	bool hide_ui;
-	bool subdued;
-
 	int song_no;
 
 	float volume; // 0.0f - 1.0f
