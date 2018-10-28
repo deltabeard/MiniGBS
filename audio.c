@@ -73,11 +73,8 @@ static size_t nsamples;
 static float* samples;
 static float* sample_ptr;
 
-static SDL_AudioDeviceID audio;
-static const int duty_lookup[] = { 0x10, 0x30, 0x3C, 0xCF };
 static float logbase;
 static float vol_l, vol_r;
-static float audio_rate;
 
 float hipass(struct chan* c, float sample){
 #if ENABLE_HIPASS
@@ -332,6 +329,8 @@ static void audio_callback(void* ptr, uint8_t* data, int len)
 
 void audio_init(void)
 {
+	SDL_AudioDeviceID audio;
+
 	if(SDL_Init(SDL_INIT_AUDIO) != 0){
 		fprintf(stderr, "Error calling SDL_Init: %s\n", SDL_GetError());
 		exit(1);
@@ -366,28 +365,9 @@ void audio_init(void)
 	SDL_PauseAudioDevice(audio, 0);
 }
 
-void audio_get_notes(uint16_t notes[static 4]){
-	for(int i = 0; i < 4; ++i){
-		if(chan_muted(chans + i)){
-			notes[i] = 0xffff;
-		} else {
-			notes[i] = chans[i].note;
-		}
-	}
-}
-
-void audio_get_vol(uint8_t vol[static 8]){
-	for(int i = 0; i < 4; ++i){
-		vol[i*2+0] = chans[i].volume * chans[i].on_left;
-		vol[i*2+1] = chans[i].volume * chans[i].on_right;
-	}
-	if(vol[4]) vol[4] = chans[2].sample >> (vol[4]-1);
-	if(vol[5]) vol[5] = chans[2].sample >> (vol[5]-1);
-}
-
 void audio_update_rate(void)
 {
-	audio_rate = VERTICAL_SYNC;
+	float audio_rate = VERTICAL_SYNC;
 
 	uint8_t tma = mem[0xff06];
 	uint8_t tac = mem[0xff07];
@@ -483,9 +463,12 @@ void audio_write(uint16_t addr, uint8_t val){
 		case 0xFF11:
 		case 0xFF16:
 		case 0xFF20:
-			chans[i].len.load = val & 0x3f;
-			chans[i].duty = duty_lookup[val >> 6];
-			break;
+			{
+				const int duty_lookup[] = { 0x10, 0x30, 0x3C, 0xCF };
+				chans[i].len.load = val & 0x3f;
+				chans[i].duty = duty_lookup[val >> 6];
+				break;
+			}
 			
 		case 0xFF1B:
 			chans[i].len.load = val;
