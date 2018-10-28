@@ -4,9 +4,8 @@
 #include <time.h>
 #include <poll.h>
 #include <sys/mman.h>
-#include <sys/timerfd.h>
-#include <sys/signalfd.h>
 #include <signal.h>
+#include <unistd.h>
 #include "minigbs.h"
 
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
@@ -15,8 +14,6 @@
 
 struct Config cfg;
 uint8_t* mem;
-int evfd_audio_request;
-int evfd_audio_ready;
 
 static uint8_t* banks[32];
 static struct GBSHeader h;
@@ -588,13 +585,15 @@ uint64_t get_time(void){
 	return (ts.tv_sec * 1000000UL) + (ts.tv_nsec / 1000UL);
 }
 
-static void fd_clear(int fd){
-	uint64_t blah;
-	ssize_t ret;
+void process_cpu(void)
+{
+	while(regs.sp != h.sp)
+		cpu_step();
 
-	do {
-		ret = read(fd, &blah, 8);
-	} while(ret == -1 && errno == EAGAIN);
+	regs.pc = h.play_addr;
+	regs.sp -= 2;
+
+	audio_update();
 }
 
 int main(int argc, char** argv){
@@ -704,25 +703,6 @@ int main(int argc, char** argv){
 	mem[0xff06] = h.tma;
 	mem[0xff07] = h.tac;
 
-	evfd_audio_request = eventfd(0, EFD_NONBLOCK);
-	evfd_audio_ready   = eventfd(0, EFD_SEMAPHORE);
-
-	sigset_t      sigmask;
-	sigemptyset (&sigmask);
-	sigaddset   (&sigmask, SIGWINCH);
-
-	struct pollfd fds[] = {
-		{ evfd_audio_request, POLLIN },
-	};
-
-	audio_init();
-
-	// hack to avoid ALSA warnings breaking the UI
-	fclose(stderr);
-
-	audio_reset();
-	clear();
-
 	if(banks[0]) memcpy(mem, banks[0], 0x4000);
 	if(banks[1]) memcpy(mem + 0x4000, banks[1], 0x4000);
 
@@ -744,31 +724,12 @@ int main(int argc, char** argv){
 	}
 	memcpy(mem + 0xff30, wave_init, 16);
 
-	audio_pause(false);
+	audio_init();
+	audio_reset();
 
 	while(1)
 	{
-		int n = poll(fds, countof(fds), -1);
-		if(n == -1){
-			perror("poll");
-			continue;
-		}
-
-		if(fds[0].revents & POLLIN){
-			fd_clear(evfd_audio_request);
-
-			while(regs.sp != h.sp){
-				cpu_step();
-			}
-
-			regs.pc = h.play_addr;
-			regs.sp -= 2;
-
-			audio_update();
-
-			fds[0].revents = 0;
-			eventfd_write(evfd_audio_ready, 1);
-		}
+		sleep(UINT16_MAX);
 	}
 
 	return 0;

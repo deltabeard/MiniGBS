@@ -10,12 +10,12 @@
 struct GBSHeader;
 struct Config;
 
+extern void process_cpu(void);
+
 void audio_init        (void);
 void audio_update      (void);
 void audio_reset       (void);
 void audio_write       (uint16_t addr, uint8_t val);
-void audio_pause       (bool);
-bool audio_mute        (int chan, int val);
 void audio_update_rate (void);
 void audio_get_notes   (uint16_t[static 4]);
 void audio_get_vol     (uint8_t vol[static 8]);

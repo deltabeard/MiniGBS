@@ -301,11 +301,6 @@ void update_noise(void){
 	}
 }
 
-bool audio_mute(int chan, int val){
-	chans[chan-1].muted = (val != -1) ? val : !chans[chan-1].muted;
-	return chans[chan-1].muted;
-}
-
 void audio_update(void){
 	memset(samples, 0, nsamples * sizeof(float));
 
@@ -317,25 +312,8 @@ void audio_update(void){
 	sample_ptr = samples + nsamples;
 }
 
-// FIXME: this is icky
-volatile int is_resetting;
-
-void audio_pause(bool p){
-	is_resetting = 1;
-	eventfd_write(evfd_audio_ready, 1);
-	SDL_LockAudioDevice(audio);
-
-	is_resetting = 0;
-	SDL_PauseAudioDevice(audio, p);
-
-	SDL_UnlockAudioDevice(audio);
-}
-
 void audio_reset(void){
-	is_resetting = 1;
-	eventfd_write(evfd_audio_ready, 1);
 	SDL_LockAudioDevice(audio);
-	is_resetting = 0;
 
 	memset(chans, 0, sizeof(chans));
 	memset(samples, 0, nsamples * sizeof(float));
@@ -343,26 +321,16 @@ void audio_reset(void){
 	chans[0].val = chans[1].val = -1;
 
 	SDL_UnlockAudioDevice(audio);
+	SDL_PauseAudioDevice(audio, 0);
 }
 
-static void audio_callback(void* ptr, uint8_t* data, int len){
+static void audio_callback(void* ptr, uint8_t* data, int len)
+{
 	len >>= 2;
 
-	if(is_resetting)
-		return;
-
 	do {
-		if(sample_ptr - samples == 0){
-			uint64_t val = 1;
-
-			eventfd_write(evfd_audio_request, val);
-
-			/* TODO: Remove GNU macro. */
-			TEMP_FAILURE_RETRY(eventfd_read(evfd_audio_ready, &val));
-
-			if(is_resetting)
-				return;
-		}
+		if(sample_ptr - samples == 0)
+			process_cpu();
 
 		int n = MIN(len, sample_ptr - samples);
 		memcpy(data, samples, n * sizeof(float));
@@ -374,8 +342,8 @@ static void audio_callback(void* ptr, uint8_t* data, int len){
 	} while(len);
 }
 
-void audio_init(void){
-
+void audio_init(void)
+{
 	if(SDL_Init(SDL_INIT_AUDIO) != 0){
 		fprintf(stderr, "Error calling SDL_Init: %s\n", SDL_GetError());
 		exit(1);
@@ -398,8 +366,6 @@ void audio_init(void){
 	logbase = log(1.059463094f);
 
 	audio_update_rate();
-
-	SDL_PauseAudioDevice(audio, 0);
 }
 
 void audio_get_notes(uint16_t notes[static 4]){
