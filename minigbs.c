@@ -563,13 +563,6 @@ void cpu_step(void)
 end:;
 }
 
-void usage(const char* argv0, FILE* out){
-	fprintf(out,
-	        "Usage: %s [-h] file [song index]\n"
-			"  -h, Output this info to stdout.\n",
-			argv0);
-}
-
 void process_cpu(void)
 {
 	while(regs.sp != h.sp)
@@ -626,6 +619,7 @@ int main(int argc, char** argv)
 		exit(EXIT_FAILURE);
 	}
 
+	/* TODO: Replace magic number with definition */
 	if((mem = malloc(0x12000)) == NULL)
 	{
 		printf("%d: malloc failure", __LINE__);
