@@ -671,12 +671,14 @@ int main(int argc, char** argv){
 	fseek(f, 0x70, SEEK_SET);
 
 	int bno = h.load_addr / 0x4000;
+	int off = h.load_addr % 0x4000;
 
 	while(1){
 		uint8_t* page = mmap(NULL, 0x4000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 		assert(page != MAP_FAILED);
 		banks[bno] = page;
 
+		size_t n = fread(page + off, 1, 0x4000 - off, f);
 		if(feof(f)){
 			break;
 		} else if(ferror(f)){
@@ -684,6 +686,7 @@ int main(int argc, char** argv){
 			break;
 		}
 
+		off = 0;
 		if(++bno >= 32){
 			puts("Too many banks...");
 			exit(1);
