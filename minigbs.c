@@ -51,14 +51,14 @@ static inline uint8_t mem_read(uint16_t addr){
 	return val;
 }
 
-bool cpu_step(void){
+void cpu_step(void)
+{
 
 	uint8_t op = mem[regs.pc];
 	size_t x = op >> 6;
 	size_t y = (op >> 3) & 7;
 	size_t z = op & 7;
 
-	bool is_ret = false;
 	unsigned cycles = 0;
 
 #define OP(x) &&op_##x
@@ -307,7 +307,6 @@ bool cpu_step(void){
 			regs.pc = ((mem_read(regs.sp+1) << 8) | mem_read(regs.sp)) - 1;
 			regs.sp += 2;
 			cycles += 12;
-			is_ret = true;
 		}
 	});
 
@@ -338,14 +337,12 @@ bool cpu_step(void){
 	OP(ret, 0, 16, {
 		regs.pc = (mem_read(regs.sp+1) << 8 | mem_read(regs.sp));
 		regs.sp += 2;
-		is_ret = true;
 	});
 
 	OP(reti, 0, 16, {
 		regs.pc = mem_read(regs.sp+1) << 8 | mem_read(regs.sp);
 		regs.sp += 2;
 		// XXX: interrupts not implemented
-		is_ret = true;
 	});
 
 	OP(jphl, 0, 4, {
@@ -561,9 +558,7 @@ bool cpu_step(void){
 		regs.flags.z = !R_READ(z);
 		regs.flags.n = regs.flags.h = 0;
 	});
-
 end:;
-	return is_ret;
 }
 
 void usage(const char* argv0, FILE* out){
