@@ -584,7 +584,7 @@ int main(int argc, char** argv)
 		exit(EXIT_FAILURE);
 	}
 
-	f = fopen(argv[1], "r");
+	f = fopen(argv[1], "rb");
 	if(!f)
 	{
 		fprintf(stderr, "Error opening file: %s\n", strerror(errno));
@@ -649,7 +649,7 @@ int main(int argc, char** argv)
 		if(feof(f)){
 			break;
 		} else if(ferror(f)){
-			printf("Error reading file: %m\n");
+			printf("Error reading file\n");
 			break;
 		}
 
