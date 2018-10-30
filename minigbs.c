@@ -716,7 +716,10 @@ int main(int argc, char** argv)
 
 	audio_init();
 
-	printf("Keys: q = Quit, n = Next, p = Previous\n");
+	/* Fixes printf's not printing to stdout until exit in Windows. */
+	setbuf(stdout, NULL);
+
+	fprintf(stdout, "Keys: q = Quit, n = Next, p = Previous\n");
 
 	while(1)
 	{
@@ -731,7 +734,7 @@ int main(int argc, char** argv)
 					regs.a = ++song_no;
 					regs.sp = h.sp - 2;
 					regs.pc = h.init_addr;
-					printf("Song %d of %d\n", song_no, h.song_count);
+					fprintf(stdout, "Song %d of %d\n", song_no, h.song_count);
 				}
 				break;
 
@@ -741,7 +744,7 @@ int main(int argc, char** argv)
 					regs.a = --song_no;
 					regs.sp = h.sp - 2;
 					regs.pc = h.init_addr;
-					printf("Song %d of %d\n", song_no, h.song_count);
+					fprintf(stdout, "Song %d of %d\n", song_no, h.song_count);
 				}
 				break;
 		}
