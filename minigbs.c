@@ -7,61 +7,75 @@
 #error "Some of the bitfield / casting used in here assumes little endian :("
 #endif
 
+#define ROM_BANK1_ADDR	0x4000
+#define VRAM_ADDR		0x8000
+
 uint8_t* mem;
 
-static uint8_t* banks[32];
 static struct GBSHeader h;
+static uint8_t *banks[32];
+static uint8_t *selected_rom_bank;
 
-void bank_switch(int which)
+void bank_switch(uint8_t which)
 {
 	// allowing bank switch to 0 seems to break some games
-	if(which > 0 && which < 32 && banks[which]){
-		memcpy(mem + 0x4000, banks[which], 0x4000);
-	}
+	if(which > 0 && which < 32 && banks[which])
+		selected_rom_bank = banks[which];
 }
 
 static inline void mem_write(uint16_t addr, uint8_t val)
 {
-	if(addr >= 0x2000 && addr < 0x4000){
+	if(addr >= 0x2000 && addr < ROM_BANK1_ADDR)
 		bank_switch(val);
-	} else if(addr >= 0xFF10 && addr <= 0xFF40){
+	else if(addr >= 0xFF10 && addr <= 0xFF40)
 		audio_write(addr, val);
-	} else if(addr < 0x8000){
-	} else if(addr == 0xFF06 || addr == 0xFF07){
+	/* Ignore other writes to ROM. */
+	else if(addr < VRAM_ADDR)
+		return;
+	else if(addr == 0xFF06 || addr == 0xFF07)
+	{
 		mem[addr] = val;
 		audio_update_rate();
-	} else {
-		mem[addr] = val;
 	}
+	else
+		mem[addr] = val;
 }
 
-static inline uint8_t mem_read(uint16_t addr){
-	uint8_t val = mem[addr];
+static inline uint8_t mem_read(uint16_t addr)
+{
+	if(addr >= 0x4000 && addr <= 0x7FFF)
+		return selected_rom_bank[addr - 0x4000];
+	else if(addr >= 0xFF10 && addr <= 0xFF26)
+	{
+		static uint8_t ortab[] = {
+			0x80, 0x3f, 0x00, 0xff, 0xbf, 0xff, 0x3f, 0x00,
+			0xff, 0xbf, 0x7f, 0xff, 0x9f, 0xff, 0xbf, 0xff,
+			0xff, 0x00, 0x00, 0xbf, 0x00, 0x00, 0x70
+		};
 
-	static uint8_t ortab[] = {
-		0x80, 0x3f, 0x00, 0xff, 0xbf,
-		0xff, 0x3f, 0x00, 0xff, 0xbf,
-		0x7f, 0xff, 0x9f, 0xff, 0xbf,
-		0xff, 0xff, 0x00, 0x00, 0xbf,
-		0x00, 0x00, 0x70
-	};
-	
-	if(addr >= 0xFF10 && addr <= 0xFF26){
-		val |= ortab[addr - 0xFF10];
+		return mem[addr] | ortab[addr - 0xFF10];
 	}
-
-	return val;
+	
+	return mem[addr];
 }
 
 void cpu_step(void)
 {
+	uint8_t op;
+	size_t x;
+	size_t y;
+	size_t z;
+	unsigned int cycles = 0;
 
-	uint8_t op = mem[regs.pc];
-	size_t x = op >> 6;
-	size_t y = (op >> 3) & 7;
-	size_t z = op & 7;
+	if(regs.pc >= ROM_BANK1_ADDR && regs.pc < VRAM_ADDR)
+		op = selected_rom_bank[regs.pc - ROM_BANK1_ADDR];
+	else
+		op = mem[regs.pc];
 
-	unsigned cycles = 0;
+	x = op >> 6;
+	y = (op >> 3) & 7;
+	z = op & 7;
+
 
 #define OP(x) &&op_##x
 #define ALUY (void*)(1)
@@ -629,8 +643,8 @@ int main(int argc, char** argv)
 	fseek(f, 0, SEEK_END);
 	fseek(f, 0x70, SEEK_SET);
 
-	int bno = h.load_addr / 0x4000;
-	int off = h.load_addr % 0x4000;
+	unsigned int bno = h.load_addr / 0x4000;
+	unsigned int off = h.load_addr % 0x4000;
 
 	/* Read all ROM banks */
 	while(1)
@@ -644,19 +658,21 @@ int main(int argc, char** argv)
 		}
 
 		banks[bno] = page;
+		fread(page + off, 1, 0x4000 - off, f);
 
-		size_t n = fread(page + off, 1, 0x4000 - off, f);
-		if(feof(f)){
+		if(feof(f))
 			break;
-		} else if(ferror(f)){
-			printf("Error reading file\n");
-			break;
+		else if(ferror(f))
+		{
+			puts("Error reading file");
+			exit(EXIT_FAILURE);
 		}
 
 		off = 0;
-		if(++bno >= 32){
-			puts("Too many banks...");
-			exit(1);
+		if(++bno >= 32)
+		{
+			puts("Too many banks in file");
+			exit(EXIT_FAILURE);
 		}
 	}
 
@@ -671,8 +687,8 @@ int main(int argc, char** argv)
 	if(banks[0])
 		memcpy(mem, banks[0], 0x4000);
 
-	if(banks[1])
-		memcpy(mem + 0x4000, banks[1], 0x4000);
+	/* Initialising the selected ROM bank to the default of Bank 1. */
+	selected_rom_bank = banks[1];
 
 	/* Initialise the rest of the working memory area. */
 	memset(mem + 0x8000, 0, 0x8000);
