@@ -76,7 +76,8 @@ static float* sample_ptr;
 static float logbase;
 static float vol_l, vol_r;
 
-float hipass(struct chan* c, float sample){
+float hipass(struct chan* c, float sample)
+{
 #if ENABLE_HIPASS
 	float out = sample - c->capacitor;
 	c->capacitor = sample - out * 0.996;
@@ -86,17 +87,19 @@ float hipass(struct chan* c, float sample){
 #endif
 }
 
-void set_note_freq(struct chan* c, float freq){
+void set_note_freq(struct chan* c, const float freq)
+{
 	c->freq_inc = freq / FREQ;
 	c->note = MAX(0, (int)roundf(logf(freq/440.0f) / logbase) + 48);
 }
 
-bool chan_muted(struct chan* c){
+bool chan_muted(const struct chan *c)
+{
 	return c->muted || !c->enabled || !c->powered || !(c->on_left ||
 			c->on_right) || !c->volume;
 }
 
-void chan_enable(int i, bool enable)
+void chan_enable(const unsigned int i, const bool enable)
 {
 	chans[i].enabled = enable;
 
@@ -109,7 +112,8 @@ void chan_enable(int i, bool enable)
 	mem[0xFF26] = val;
 }
 
-void update_env(struct chan* c){
+void update_env(struct chan* c)
+{
 	c->env.counter += c->env.inc;
 
 	while(c->env.counter > 1.0f){
@@ -124,7 +128,8 @@ void update_env(struct chan* c){
 	}
 }
 
-void update_len(struct chan* c){
+void update_len(struct chan *c)
+{
 	if(c->len.enabled){
 		c->len.counter += c->len.inc;
 		if(c->len.counter > 1.0f){
@@ -134,7 +139,8 @@ void update_len(struct chan* c){
 	}
 }
 
-bool update_freq(struct chan* c, float* pos){
+bool update_freq(struct chan* c, float *pos)
+{
 	float inc = c->freq_inc - *pos;
 	c->freq_counter += inc;
 
@@ -148,7 +154,8 @@ bool update_freq(struct chan* c, float* pos){
 	}
 }
 
-void update_sweep(struct chan* c){
+void update_sweep(struct chan* c)
+{
 	c->sweep.counter += c->sweep.inc;
 
 	while(c->sweep.counter > 1.0f){
@@ -170,19 +177,23 @@ void update_sweep(struct chan* c){
 	}
 }
 
-void update_square(bool ch2){
+void update_square(const bool ch2)
+{
 	struct chan* c = chans + ch2;
 	if(!c->powered) return;
 
 	set_note_freq(c, 4194304.0f / (float)((2048 - c->freq) << 5));
 	c->freq_inc *= 8.0f;
 
-	for(int i = 0; i < nsamples; i+=2){
+	for(int i = 0; i < nsamples; i+=2)
+	{
 		update_len(c);
 
-		if(c->enabled){
+		if(c->enabled)
+		{
 			update_env(c);
-			if(!ch2) update_sweep(c);
+			if(!ch2)
+				update_sweep(c);
 
 			float pos = 0.0f;
 			float prev_pos = 0.0f;
@@ -205,7 +216,8 @@ void update_square(bool ch2){
 	}
 }
 
-static uint8_t wave_sample(int pos, int volume){
+static uint8_t wave_sample(const unsigned int pos, const unsigned int volume)
+{
 	uint8_t sample = mem[0xFF30 + pos / 2];
 	if(pos & 1){
 		sample &= 0xF;
@@ -215,7 +227,8 @@ static uint8_t wave_sample(int pos, int volume){
 	return volume ? (sample >> (volume-1)) : 0;
 }
 
-void update_wave(void){
+void update_wave(void)
+{
 	struct chan* c = chans + 2;
 	if(!c->powered) return;
 
@@ -255,18 +268,19 @@ void update_wave(void){
 	}
 }
 
-void update_noise(void){
+void update_noise(void)
+{
 	struct chan* c = chans + 3;
 	if(!c->powered) return;
 
 	float freq = 4194304.0f / (float)((size_t[]){ 8, 16, 32, 48, 64, 80, 96, 112 }[c->lfsr_div] << (size_t)c->freq);
 	set_note_freq(c, freq);
 
-	if(c->freq >= 14){
+	if(c->freq >= 14)
 		c->enabled = false;
-	}
 
-	for(int i = 0; i < nsamples; i+=2){
+	for(int i = 0; i < nsamples; i+=2)
+	{
 		update_len(c);
 
 		if(c->enabled){
@@ -298,7 +312,8 @@ void update_noise(void){
 	}
 }
 
-void audio_update(void){
+void audio_update(void)
+{
 	memset(samples, 0, nsamples * sizeof(float));
 
 	update_square(0);
@@ -384,7 +399,8 @@ void audio_update_rate(void)
 	sample_ptr = samples;
 }
 
-void chan_trigger(int i){
+void chan_trigger(int i)
+{
 	struct chan* c = chans + i;
 
 	chan_enable(i, 1);
@@ -426,12 +442,12 @@ void chan_trigger(int i){
 	c->len.counter = 0.0f;
 }
 
-void audio_write(uint16_t addr, uint8_t val){
-
+void audio_write(const uint16_t addr, const uint8_t val)
+{
 	int i = (addr - 0xFF10)/5;
 
-	switch(addr){
-
+	switch(addr)
+	{
 		case 0xFF12:
 		case 0xFF17:
 		case 0xFF21: {
@@ -493,9 +509,9 @@ void audio_write(uint16_t addr, uint8_t val){
 			chans[i].freq |= ((val & 0x07) << 8);
 		case 0xFF23:
 			chans[i].len.enabled = val & 0x40;
-			if(val & 0x80){
+			if(val & 0x80)
 				chan_trigger(i);
-			}
+
 			break;
 
 		case 0xFF22:
@@ -509,12 +525,13 @@ void audio_write(uint16_t addr, uint8_t val){
 			vol_r = (val & 0x07) / 7.0f;
 			break;
 
-		case 0xFF25: {
-			for(int i = 0; i < 4; ++i){
+		case 0xFF25:
+			for(int i = 0; i < 4; ++i)
+			{
 				chans[i].on_left  = (val >> (4 + i)) & 1;
 				chans[i].on_right = (val >> i) & 1;
 			}
-		} break;
+			break;
 	}
 
 	mem[addr] = val;

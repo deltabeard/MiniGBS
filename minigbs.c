@@ -16,14 +16,14 @@ static struct GBSHeader h;
 static uint8_t *banks[32];
 static uint8_t *selected_rom_bank;
 
-void bank_switch(uint8_t which)
+static void bank_switch(const uint8_t which)
 {
 	// allowing bank switch to 0 seems to break some games
 	if(which > 0 && which < 32 && banks[which])
 		selected_rom_bank = banks[which];
 }
 
-static inline void mem_write(uint16_t addr, uint8_t val)
+static void mem_write(const uint16_t addr, const uint8_t val)
 {
 	if(addr >= 0x2000 && addr < ROM_BANK1_ADDR)
 		bank_switch(val);
@@ -41,7 +41,7 @@ static inline void mem_write(uint16_t addr, uint8_t val)
 		mem[addr] = val;
 }
 
-static inline uint8_t mem_read(uint16_t addr)
+static uint8_t mem_read(const uint16_t addr)
 {
 	if(addr >= 0x4000 && addr <= 0x7FFF)
 		return selected_rom_bank[addr - 0x4000];
@@ -59,7 +59,7 @@ static inline uint8_t mem_read(uint16_t addr)
 	return mem[addr];
 }
 
-void cpu_step(void)
+static void cpu_step(void)
 {
 	uint8_t op;
 	size_t x;
