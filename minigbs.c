@@ -691,7 +691,7 @@ int main(int argc, char** argv)
 	selected_rom_bank = banks[1];
 
 	/* Initialise the rest of the working memory area. */
-	memset(mem + 0x8000, 0, 0x8000);
+	memset(mem + VRAM_ADDR, 0, 0x8000);
 
 	/* Initialise CPU registers. */
 	memset(&regs, 0, sizeof(regs));
@@ -714,20 +714,17 @@ int main(int argc, char** argv)
 			0xFF, 0x00, 0x00, 0x3F, 0x77, 0xF3, 0xF1
 		};
 
-		for(int i = 0; i < 23; ++i)
-			mem_write(0xFF10 + i, regs_init[i]);
+		memcpy(mem + 0xFF10, &regs_init, sizeof(regs_init));
 	}
 
 	/* Initialise Wave Pattern RAM. */
 	{
 		const uint8_t wave_init[] = {
-			0xac, 0xdd, 0xda, 0x48,
-			0x36, 0x02, 0xcf, 0x16,
-			0x2c, 0x04, 0xe5, 0x2c,
-			0xac, 0xdd, 0xda, 0x48
+			0xac, 0xdd, 0xda, 0x48, 0x36, 0x02, 0xcf, 0x16,
+			0x2c, 0x04, 0xe5, 0x2c, 0xac, 0xdd, 0xda, 0x48
 		};
 
-		memcpy(mem + 0xff30, wave_init, 16);
+		memcpy(mem + 0xff30, &wave_init, sizeof(wave_init));
 	}
 
 	audio_init();
