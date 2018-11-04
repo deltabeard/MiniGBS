@@ -42,14 +42,14 @@ struct chan_freq_sweep {
 };
 
 static struct chan {
-	bool enabled;
-	bool powered;
-	bool on_left;
-	bool on_right;
-	bool muted;
+	int enabled : 1;
+	int on_left : 1;
+	int on_right : 1;
+	int muted : 1;
+	uint8_t powered;
 
-	int volume;
-	int volume_init;
+	unsigned int volume : 4;
+	unsigned int volume_init : 4;
 
 	uint16_t freq;
 	float    freq_counter;
@@ -65,8 +65,8 @@ static struct chan {
 	float capacitor;
 
 	// square
-	int duty;
-	int duty_counter;
+	uint8_t duty;
+	uint8_t duty_counter;
 
 	// noise
 	uint16_t lfsr_reg;
@@ -202,7 +202,7 @@ static void update_square(const bool ch2)
 			float sample = 0.0f;
 
 			while(update_freq(c, &pos)){
-				c->duty_counter = (c->duty_counter + 1) & 7;
+				c->duty_counter = (c->duty_counter + 1) & 0b111;
 				sample += ((pos - prev_pos) / c->freq_inc) * (float)c->val;
 				c->val = (c->duty & (1 << c->duty_counter)) ? 1 : -1;
 				prev_pos = pos;
@@ -480,7 +480,7 @@ void audio_write(const uint16_t addr, const uint8_t val)
 		case 0xFF16:
 		case 0xFF20:
 			{
-				const int duty_lookup[] = { 0x10, 0x30, 0x3C, 0xCF };
+				const uint8_t duty_lookup[] = { 0x10, 0x30, 0x3C, 0xCF };
 				chans[i].len.load = val & 0x3f;
 				chans[i].duty = duty_lookup[val >> 6];
 				break;
