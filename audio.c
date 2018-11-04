@@ -76,7 +76,7 @@ static float* sample_ptr;
 static float logbase;
 static float vol_l, vol_r;
 
-float hipass(struct chan* c, float sample)
+static float hipass(struct chan* c, float sample)
 {
 #if ENABLE_HIPASS
 	float out = sample - c->capacitor;
@@ -87,19 +87,13 @@ float hipass(struct chan* c, float sample)
 #endif
 }
 
-void set_note_freq(struct chan* c, const float freq)
+static void set_note_freq(struct chan* c, const float freq)
 {
 	c->freq_inc = freq / FREQ;
 	c->note = MAX(0, (int)roundf(logf(freq/440.0f) / logbase) + 48);
 }
 
-bool chan_muted(const struct chan *c)
-{
-	return c->muted || !c->enabled || !c->powered || !(c->on_left ||
-			c->on_right) || !c->volume;
-}
-
-void chan_enable(const unsigned int i, const bool enable)
+static void chan_enable(const unsigned int i, const bool enable)
 {
 	chans[i].enabled = enable;
 
@@ -112,7 +106,7 @@ void chan_enable(const unsigned int i, const bool enable)
 	mem[0xFF26] = val;
 }
 
-void update_env(struct chan* c)
+static void update_env(struct chan* c)
 {
 	c->env.counter += c->env.inc;
 
@@ -128,7 +122,7 @@ void update_env(struct chan* c)
 	}
 }
 
-void update_len(struct chan *c)
+static void update_len(struct chan *c)
 {
 	if(c->len.enabled){
 		c->len.counter += c->len.inc;
@@ -139,7 +133,7 @@ void update_len(struct chan *c)
 	}
 }
 
-bool update_freq(struct chan* c, float *pos)
+static bool update_freq(struct chan* c, float *pos)
 {
 	float inc = c->freq_inc - *pos;
 	c->freq_counter += inc;
@@ -154,7 +148,7 @@ bool update_freq(struct chan* c, float *pos)
 	}
 }
 
-void update_sweep(struct chan* c)
+static void update_sweep(struct chan* c)
 {
 	c->sweep.counter += c->sweep.inc;
 
@@ -177,7 +171,7 @@ void update_sweep(struct chan* c)
 	}
 }
 
-void update_square(const bool ch2)
+static void update_square(const bool ch2)
 {
 	struct chan* c = chans + ch2;
 	if(!c->powered) return;
@@ -227,7 +221,7 @@ static uint8_t wave_sample(const unsigned int pos, const unsigned int volume)
 	return volume ? (sample >> (volume-1)) : 0;
 }
 
-void update_wave(void)
+static void update_wave(void)
 {
 	struct chan* c = chans + 2;
 	if(!c->powered) return;
@@ -268,7 +262,7 @@ void update_wave(void)
 	}
 }
 
-void update_noise(void)
+static void update_noise(void)
 {
 	struct chan* c = chans + 3;
 	if(!c->powered) return;
@@ -312,18 +306,6 @@ void update_noise(void)
 	}
 }
 
-void audio_update(void)
-{
-	memset(samples, 0, nsamples * sizeof(float));
-
-	update_square(0);
-	update_square(1);
-	update_wave();
-	update_noise();
-
-	sample_ptr = samples + nsamples;
-}
-
 static void audio_callback(void* ptr, uint8_t* data, int len)
 {
 	len >>= 2;
@@ -340,6 +322,25 @@ static void audio_callback(void* ptr, uint8_t* data, int len)
 		sample_ptr -= n;
 		len -= n;
 	} while(len);
+}
+
+void audio_update_rate(void)
+{
+	float audio_rate = VERTICAL_SYNC;
+
+	uint8_t tma = mem[0xff06];
+	uint8_t tac = mem[0xff07];
+
+	if(tac & 0x04){
+		int rates[] = { 4096, 262144, 65536, 16384 };
+		audio_rate = rates[tac & 0x03] / (float)(256 - tma);
+		if(tac & 0x80) audio_rate *= 2.0f;
+	}
+
+	free(samples);
+	nsamples  = (int)(FREQ / audio_rate) * 2;
+	samples   = calloc(nsamples, sizeof(float));
+	sample_ptr = samples;
 }
 
 void audio_init(void)
@@ -380,26 +381,7 @@ void audio_init(void)
 	SDL_PauseAudioDevice(audio, 0);
 }
 
-void audio_update_rate(void)
-{
-	float audio_rate = VERTICAL_SYNC;
-
-	uint8_t tma = mem[0xff06];
-	uint8_t tac = mem[0xff07];
-
-	if(tac & 0x04){
-		int rates[] = { 4096, 262144, 65536, 16384 };
-		audio_rate = rates[tac & 0x03] / (float)(256 - tma);
-		if(tac & 0x80) audio_rate *= 2.0f;
-	}
-
-	free(samples);
-	nsamples  = (int)(FREQ / audio_rate) * 2;
-	samples   = calloc(nsamples, sizeof(float));
-	sample_ptr = samples;
-}
-
-void chan_trigger(int i)
+static void chan_trigger(int i)
 {
 	struct chan* c = chans + i;
 
@@ -535,4 +517,16 @@ void audio_write(const uint16_t addr, const uint8_t val)
 	}
 
 	mem[addr] = val;
+}
+
+void audio_update(void)
+{
+	memset(samples, 0, nsamples * sizeof(float));
+
+	update_square(0);
+	update_square(1);
+	update_wave();
+	update_noise();
+
+	sample_ptr = samples + nsamples;
 }
