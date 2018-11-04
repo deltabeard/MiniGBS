@@ -26,7 +26,7 @@ static void bank_switch(const uint8_t which)
 static void mem_write(const uint16_t addr, const uint8_t val)
 {
 	/* Call audio_write when writing to audio registers. */
-	if(addr >= 0xFF06 && addr <= 0xFF40)
+	if(addr >= 0xFF06 && addr <= 0xFF3F)
 	{
 		mem[addr] = val;
 		audio_write(addr, val);
