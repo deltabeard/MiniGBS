@@ -25,18 +25,18 @@ static void bank_switch(const uint8_t which)
 
 static void mem_write(const uint16_t addr, const uint8_t val)
 {
-	if(addr >= 0x2000 && addr < ROM_BANK1_ADDR)
-		bank_switch(val);
-	else if(addr >= 0xFF10 && addr <= 0xFF40)
+	/* Call audio_write when writing to audio registers. */
+	if(addr >= 0xFF06 && addr <= 0xFF40)
+	{
+		mem[addr] = val;
 		audio_write(addr, val);
+	}
+	/* Switch ROM banks. */
+	else if(addr >= 0x2000 && addr < ROM_BANK1_ADDR)
+		bank_switch(val);
 	/* Ignore other writes to ROM. */
 	else if(addr < VRAM_ADDR)
 		return;
-	else if(addr == 0xFF06 || addr == 0xFF07)
-	{
-		mem[addr] = val;
-		audio_update_rate();
-	}
 	else
 		mem[addr] = val;
 }

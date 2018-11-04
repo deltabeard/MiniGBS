@@ -324,7 +324,7 @@ static void audio_callback(void* ptr, uint8_t* data, int len)
 	} while(len);
 }
 
-void audio_update_rate(void)
+static void audio_update_rate(void)
 {
 	float audio_rate = VERTICAL_SYNC;
 
@@ -426,10 +426,16 @@ static void chan_trigger(int i)
 
 void audio_write(const uint16_t addr, const uint8_t val)
 {
+	/* Find sound channel corresponding to register address. */
 	int i = (addr - 0xFF10)/5;
 
 	switch(addr)
 	{
+		case 0xFF06:
+		case 0xFF07:
+			audio_update_rate();
+			break;
+
 		case 0xFF12:
 		case 0xFF17:
 		case 0xFF21: {
@@ -515,8 +521,6 @@ void audio_write(const uint16_t addr, const uint8_t val)
 			}
 			break;
 	}
-
-	mem[addr] = val;
 }
 
 void audio_update(void)
