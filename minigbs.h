@@ -13,6 +13,7 @@ extern void process_cpu(void);
 void audio_init        (void);
 void audio_update      (void);
 void audio_write       (uint16_t addr, uint8_t val);
+uint8_t audio_read(const uint16_t addr);
 
 struct GBSHeader {
 	char     id[3];

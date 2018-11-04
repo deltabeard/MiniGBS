@@ -45,16 +45,8 @@ static uint8_t mem_read(const uint16_t addr)
 {
 	if(addr >= 0x4000 && addr <= 0x7FFF)
 		return selected_rom_bank[addr - 0x4000];
-	else if(addr >= 0xFF10 && addr <= 0xFF26)
-	{
-		static uint8_t ortab[] = {
-			0x80, 0x3f, 0x00, 0xff, 0xbf, 0xff, 0x3f, 0x00,
-			0xff, 0xbf, 0x7f, 0xff, 0x9f, 0xff, 0xbf, 0xff,
-			0xff, 0x00, 0x00, 0xbf, 0x00, 0x00, 0x70
-		};
-
-		return mem[addr] | ortab[addr - 0xFF10];
-	}
+	else if(addr >= 0xFF06 && addr <= 0xFF3F)
+		return audio_read(addr);
 	
 	return mem[addr];
 }
@@ -679,10 +671,6 @@ int main(int argc, char** argv)
 	/* Close input file after loading file. */
 	fclose(f);
 
-	/* Load timer values from file. */
-	mem[0xff06] = h.tma;
-	mem[0xff07] = h.tac;
-
 	/* Copy data to ROM banks 1 and 2. */
 	if(banks[0])
 		memcpy(mem, banks[0], 0x4000);
@@ -703,31 +691,12 @@ int main(int argc, char** argv)
 	regs.a = song_no;
 
 	mem[0xffff] = 1; // IE
-	mem[0xff06] = h.tma;
-	mem[0xff07] = h.tac;
-
-	/* Initialise IO registers. */
-	{
-		const uint8_t regs_init[] = {
-			0x80, 0xBF, 0xF3, 0xFF, 0x3F, 0xFF, 0x3F, 0x00,
-			0xFF, 0x3F, 0x7F, 0xFF, 0x9F, 0xFF, 0x3F, 0xFF,
-			0xFF, 0x00, 0x00, 0x3F, 0x77, 0xF3, 0xF1
-		};
-
-		memcpy(mem + 0xFF10, &regs_init, sizeof(regs_init));
-	}
-
-	/* Initialise Wave Pattern RAM. */
-	{
-		const uint8_t wave_init[] = {
-			0xac, 0xdd, 0xda, 0x48, 0x36, 0x02, 0xcf, 0x16,
-			0x2c, 0x04, 0xe5, 0x2c, 0xac, 0xdd, 0xda, 0x48
-		};
-
-		memcpy(mem + 0xff30, &wave_init, sizeof(wave_init));
-	}
 
 	audio_init();
+
+	/* Load timer values from file. */
+	audio_write(0xff06, h.tma);
+	audio_write(0xff07, h.tac);
 
 	/* Fixes printf's not printing to stdout until exit in Windows. */
 	setbuf(stdout, NULL);

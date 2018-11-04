@@ -10,6 +10,14 @@
 
 #define FREQ 48000.0f
 
+#define AUDIO_MEM_SIZE			(0xFF3F - 0xFF06 + 1)
+#define AUDIO_ADDR_COMPENSATION	0xFF06
+
+/**
+ * Memory holding audio registers between 0xFF06 and 0xFF3F inclusive.
+ */
+static uint8_t audio_mem[AUDIO_MEM_SIZE];
+
 struct chan_len_ctr {
 	int   load;
 	bool  enabled;
@@ -97,13 +105,13 @@ static void chan_enable(const unsigned int i, const bool enable)
 {
 	chans[i].enabled = enable;
 
-	uint8_t val = (mem[0xFF26] & 0x80)
+	uint8_t val = (audio_mem[0xFF26 - AUDIO_ADDR_COMPENSATION] & 0x80)
 		| (chans[3].enabled << 3)
 		| (chans[2].enabled << 2)
 		| (chans[1].enabled << 1)
 		| (chans[0].enabled << 0);
 
-	mem[0xFF26] = val;
+	audio_mem[0xFF26 - AUDIO_ADDR_COMPENSATION] = val;
 }
 
 static void update_env(struct chan* c)
@@ -212,7 +220,7 @@ static void update_square(const bool ch2)
 
 static uint8_t wave_sample(const unsigned int pos, const unsigned int volume)
 {
-	uint8_t sample = mem[0xFF30 + pos / 2];
+	uint8_t sample = audio_mem[(0xFF30 + pos / 2) - AUDIO_ADDR_COMPENSATION];
 	if(pos & 1){
 		sample &= 0xF;
 	} else {
@@ -328,8 +336,8 @@ static void audio_update_rate(void)
 {
 	float audio_rate = VERTICAL_SYNC;
 
-	uint8_t tma = mem[0xff06];
-	uint8_t tac = mem[0xff07];
+	uint8_t tma = audio_mem[0xff06 - AUDIO_ADDR_COMPENSATION];
+	uint8_t tac = audio_mem[0xff07 - AUDIO_ADDR_COMPENSATION];
 
 	if(tac & 0x04){
 		int rates[] = { 4096, 262144, 65536, 16384 };
@@ -343,44 +351,6 @@ static void audio_update_rate(void)
 	sample_ptr = samples;
 }
 
-void audio_init(void)
-{
-	SDL_AudioDeviceID audio;
-
-	if(SDL_Init(SDL_INIT_AUDIO) != 0){
-		fprintf(stderr, "Error calling SDL_Init: %s\n", SDL_GetError());
-		exit(1);
-	}
-
-	SDL_AudioSpec want = {
-		.freq     = FREQ,
-		.channels = 2,
-		.samples  = 3000,
-		.format   = AUDIO_F32SYS,
-		.callback = audio_callback,
-	};
-
-	SDL_AudioSpec got;
-	if((audio = SDL_OpenAudioDevice(NULL, 0, &want, &got, 0)) == 0)
-	{
-		printf("OpenAudio failed: %s.\n", SDL_GetError());
-		exit(1);
-	}
-
-	logbase = log(1.059463094f);
-
-	audio_update_rate();
-
-	/* Initialise channels and samples. */
-	memset(chans, 0, sizeof(chans));
-	memset(samples, 0, nsamples * sizeof(float));
-	sample_ptr = samples;
-	chans[0].val = chans[1].val = -1;
-
-	/* Begin playing audio. */
-	SDL_PauseAudioDevice(audio, 0);
-}
-
 static void chan_trigger(int i)
 {
 	struct chan* c = chans + i;
@@ -390,7 +360,7 @@ static void chan_trigger(int i)
 
 	// volume envelope
 	{
-		uint8_t val = mem[0xFF12 + (i*5)];
+		uint8_t val = audio_mem[(0xFF12 + (i*5)) - AUDIO_ADDR_COMPENSATION];
 
 		c->env.step    = val & 0x07;
 		c->env.up      = val & 0x08;
@@ -400,7 +370,7 @@ static void chan_trigger(int i)
 
 	// freq sweep
 	if(i == 0){
-		uint8_t val = mem[0xFF10];
+		uint8_t val = audio_mem[0xFF10 - AUDIO_ADDR_COMPENSATION];
 
 		c->sweep.freq    = c->freq;
 		c->sweep.rate    = (val >> 4) & 0x07;
@@ -424,10 +394,52 @@ static void chan_trigger(int i)
 	c->len.counter = 0.0f;
 }
 
+void audio_update(void)
+{
+	memset(samples, 0, nsamples * sizeof(float));
+
+	update_square(0);
+	update_square(1);
+	update_wave();
+	update_noise();
+
+	sample_ptr = samples + nsamples;
+}
+
+/**
+ * Read audio register.
+ * \param addr	Address of audio register. Must be 0xFF06 <= addr <= 0xFF3F.
+ *				This is not checked in this function.
+ * \return		Byte at address.
+ */
+uint8_t audio_read(const uint16_t addr)
+{
+	static uint8_t ortab[] = {
+		0x80, 0x3f, 0x00, 0xff, 0xbf, 0xff, 0x3f, 0x00,
+		0xff, 0xbf, 0x7f, 0xff, 0x9f, 0xff, 0xbf, 0xff,
+		0xff, 0x00, 0x00, 0xbf, 0x00, 0x00, 0x70
+	};
+
+	if(addr > 0xFF26)
+		return audio_mem[addr - AUDIO_ADDR_COMPENSATION];
+	else if(addr >= 0xFF10)
+		return audio_mem[addr - AUDIO_ADDR_COMPENSATION] | ortab[addr - 0xFF10];
+
+	return audio_mem[addr - AUDIO_ADDR_COMPENSATION];
+}
+
+
+/**
+ * Write audio register.
+ * \param addr	Address of audio register. Must be 0xFF06 <= addr <= 0xFF3F.
+ *				This is not checked in this function.
+ * \param val	Byte to write at address.
+ */
 void audio_write(const uint16_t addr, const uint8_t val)
 {
 	/* Find sound channel corresponding to register address. */
 	int i = (addr - 0xFF10)/5;
+	audio_mem[addr - AUDIO_ADDR_COMPENSATION] = val;
 
 	switch(addr)
 	{
@@ -523,14 +535,63 @@ void audio_write(const uint16_t addr, const uint8_t val)
 	}
 }
 
-void audio_update(void)
+void audio_init(void)
 {
+	SDL_AudioDeviceID audio;
+
+	if(SDL_Init(SDL_INIT_AUDIO) != 0){
+		fprintf(stderr, "Error calling SDL_Init: %s\n", SDL_GetError());
+		exit(1);
+	}
+
+	SDL_AudioSpec want = {
+		.freq     = FREQ,
+		.channels = 2,
+		.samples  = 3000,
+		.format   = AUDIO_F32SYS,
+		.callback = audio_callback,
+	};
+
+	SDL_AudioSpec got;
+	if((audio = SDL_OpenAudioDevice(NULL, 0, &want, &got, 0)) == 0)
+	{
+		printf("OpenAudio failed: %s.\n", SDL_GetError());
+		exit(1);
+	}
+
+	logbase = log(1.059463094f);
+
+	audio_update_rate();
+
+	/* Initialise channels and samples. */
+	memset(chans, 0, sizeof(chans));
 	memset(samples, 0, nsamples * sizeof(float));
+	sample_ptr = samples;
+	chans[0].val = chans[1].val = -1;
 
-	update_square(0);
-	update_square(1);
-	update_wave();
-	update_noise();
+	/* Initialise IO registers. */
+	{
+		const uint8_t regs_init[] = {
+			0x80, 0xBF, 0xF3, 0xFF, 0x3F, 0xFF, 0x3F, 0x00,
+			0xFF, 0x3F, 0x7F, 0xFF, 0x9F, 0xFF, 0x3F, 0xFF,
+			0xFF, 0x00, 0x00, 0x3F, 0x77, 0xF3, 0xF1
+		};
 
-	sample_ptr = samples + nsamples;
+		memcpy(audio_mem + 0xFF10 - AUDIO_ADDR_COMPENSATION, &regs_init,
+				sizeof(regs_init));
+	}
+
+	/* Initialise Wave Pattern RAM. */
+	{
+		const uint8_t wave_init[] = {
+			0xac, 0xdd, 0xda, 0x48, 0x36, 0x02, 0xcf, 0x16,
+			0x2c, 0x04, 0xe5, 0x2c, 0xac, 0xdd, 0xda, 0x48
+		};
+
+		memcpy(mem + 0xff30 - AUDIO_ADDR_COMPENSATION, &wave_init,
+				sizeof(wave_init));
+	}
+
+	/* Begin playing audio. */
+	SDL_PauseAudioDevice(audio, 0);
 }
