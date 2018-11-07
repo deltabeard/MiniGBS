@@ -81,7 +81,6 @@ static size_t nsamples;
 static float* samples;
 static float* sample_ptr;
 
-static float logbase;
 static float vol_l, vol_r;
 
 static float hipass(struct chan* c, float sample)
@@ -98,7 +97,7 @@ static float hipass(struct chan* c, float sample)
 static void set_note_freq(struct chan* c, const float freq)
 {
 	c->freq_inc = freq / AUDIO_SAMPLE_RATE;
-	c->note = MAX(0, (int)roundf(logf(freq/440.0f) / logbase) + 48);
+	c->note = MAX(0, (int)roundf(logf(freq/440.0f)) + 48);
 }
 
 static void chan_enable(const unsigned int i, const bool enable)
@@ -558,8 +557,6 @@ void audio_init(void)
 		printf("OpenAudio failed: %s.\n", SDL_GetError());
 		exit(1);
 	}
-
-	logbase = log(1.059463094f);
 
 	audio_update_rate();
 
