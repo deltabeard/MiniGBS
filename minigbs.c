@@ -692,11 +692,11 @@ int main(int argc, char** argv)
 
 	mem[0xffff] = 1; // IE
 
-	audio_init();
-
 	/* Load timer values from file. */
 	audio_write(0xff06, h.tma);
 	audio_write(0xff07, h.tac);
+
+	audio_init();
 
 	/* Fixes printf's not printing to stdout until exit in Windows. */
 	setbuf(stdout, NULL);
