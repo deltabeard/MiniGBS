@@ -1,6 +1,8 @@
+#include <SDL2/SDL.h>
 #include <errno.h>
 #include <math.h>
 #include <stdlib.h>
+#include "audio.h"
 #include "minigbs.h"
 
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
@@ -9,6 +11,47 @@
 
 #define ROM_BANK1_ADDR	0x4000
 #define VRAM_ADDR		0x8000
+
+struct GBSHeader {
+	char     id[3];
+	uint8_t  version;
+	uint8_t  song_count;
+	uint8_t  start_song;
+	uint16_t load_addr;
+	uint16_t init_addr;
+	uint16_t play_addr;
+	uint16_t sp;
+	uint8_t  tma;
+	uint8_t  tac;
+	char     title[32];
+	char     author[32];
+	char     copyright[32];
+} __attribute__((packed)) GBSHeader;
+
+struct Config {
+	int song_no;
+} Config;
+
+struct {
+	union {
+		uint16_t af;
+		struct {
+			union {
+				struct { uint8_t _pad:4, c:1, h:1, n:1, z:1; };
+				uint8_t all;
+			} flags;
+			uint8_t a;
+		};
+	};
+	union { uint16_t bc; struct { uint8_t c, b; }; };
+	union { uint16_t de; struct { uint8_t e, d; }; };
+	union { uint16_t hl; struct { uint8_t l, h; }; };
+	uint16_t sp, pc;
+} regs;
+
+#define MAX(a, b) ({ a >  b ? a : b; })
+#define MIN(a, b) ({ a <= b ? a : b; })
+#define countof(x) (sizeof(x)/sizeof(*x))
 
 uint8_t* mem;
 
@@ -697,6 +740,33 @@ int main(int argc, char** argv)
 	audio_write(0xff07, h.tac);
 
 	audio_init();
+
+	/* Initialise SDL audio. */
+	{
+		SDL_AudioDeviceID audio;
+		SDL_AudioSpec got;
+		SDL_AudioSpec want = {
+			.freq     = AUDIO_SAMPLE_RATE,
+			.channels = 2,
+			.samples  = 4096,
+			.format   = AUDIO_F32SYS,
+			.callback = audio_callback,
+		};
+
+		if(SDL_Init(SDL_INIT_AUDIO) != 0){
+			fprintf(stderr, "Error calling SDL_Init: %s\n", SDL_GetError());
+			exit(1);
+		}
+
+		if((audio = SDL_OpenAudioDevice(NULL, 0, &want, &got, 0)) == 0)
+		{
+			printf("OpenAudio failed: %s.\n", SDL_GetError());
+			exit(1);
+		}
+
+		/* Begin playing audio. */
+		SDL_PauseAudioDevice(audio, 0);
+	}
 
 	/* Fixes printf's not printing to stdout until exit in Windows. */
 	setbuf(stdout, NULL);

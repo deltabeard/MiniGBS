@@ -1,4 +1,10 @@
-#include <SDL2/SDL.h>
+#include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "audio.h"
 #include "minigbs.h"
 
 #define ENABLE_HIPASS 1
@@ -8,10 +14,11 @@
 #define SCREEN_REFRESH_CYCLES	70224.0
 #define VERTICAL_SYNC		(DMG_CLOCK_FREQ/SCREEN_REFRESH_CYCLES)
 
-#define AUDIO_SAMPLE_RATE 48000.0f
-
 #define AUDIO_MEM_SIZE			(0xFF3F - 0xFF06 + 1)
 #define AUDIO_ADDR_COMPENSATION	0xFF06
+
+#define MAX(a, b) ({ a >  b ? a : b; })
+#define MIN(a, b) ({ a <= b ? a : b; })
 
 /**
  * Memory holding audio registers between 0xFF06 and 0xFF3F inclusive.
@@ -313,7 +320,7 @@ static void update_noise(void)
 	}
 }
 
-static void audio_callback(void* ptr, uint8_t* data, int len)
+void audio_callback(void* ptr, uint8_t* data, int len)
 {
 	len >>= 2;
 
@@ -335,11 +342,11 @@ static void audio_update_rate(void)
 {
 	float audio_rate = VERTICAL_SYNC;
 
-	uint8_t tma = audio_mem[0xff06 - AUDIO_ADDR_COMPENSATION];
-	uint8_t tac = audio_mem[0xff07 - AUDIO_ADDR_COMPENSATION];
+	const uint8_t tma = audio_mem[0xff06 - AUDIO_ADDR_COMPENSATION];
+	const uint8_t tac = audio_mem[0xff07 - AUDIO_ADDR_COMPENSATION];
 
 	if(tac & 0x04){
-		int rates[] = { 4096, 262144, 65536, 16384 };
+		const int rates[] = { 4096, 262144, 65536, 16384 };
 		audio_rate = rates[tac & 0x03] / (float)(256 - tma);
 		if(tac & 0x80) audio_rate *= 2.0f;
 	}
@@ -536,30 +543,6 @@ void audio_write(const uint16_t addr, const uint8_t val)
 
 void audio_init(void)
 {
-	SDL_AudioDeviceID audio;
-
-	if(SDL_Init(SDL_INIT_AUDIO) != 0){
-		fprintf(stderr, "Error calling SDL_Init: %s\n", SDL_GetError());
-		exit(1);
-	}
-
-	SDL_AudioSpec want = {
-		.freq     = AUDIO_SAMPLE_RATE,
-		.channels = 2,
-		.samples  = 4096,
-		.format   = AUDIO_F32SYS,
-		.callback = audio_callback,
-	};
-
-	SDL_AudioSpec got;
-	if((audio = SDL_OpenAudioDevice(NULL, 0, &want, &got, 0)) == 0)
-	{
-		printf("OpenAudio failed: %s.\n", SDL_GetError());
-		exit(1);
-	}
-
-	audio_update_rate();
-
 	/* Initialise channels and samples. */
 	memset(chans, 0, sizeof(chans));
 	memset(samples, 0, nsamples * sizeof(float));
@@ -585,10 +568,9 @@ void audio_init(void)
 			0x2c, 0x04, 0xe5, 0x2c, 0xac, 0xdd, 0xda, 0x48
 		};
 
-		memcpy(mem + 0xff30 - AUDIO_ADDR_COMPENSATION, &wave_init,
+		memcpy(audio_mem + 0xFF30 - AUDIO_ADDR_COMPENSATION, &wave_init,
 				sizeof(wave_init));
 	}
 
-	/* Begin playing audio. */
-	SDL_PauseAudioDevice(audio, 0);
+	audio_update_rate();
 }
