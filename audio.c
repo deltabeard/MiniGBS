@@ -8,7 +8,7 @@
 #define SCREEN_REFRESH_CYCLES	70224.0
 #define VERTICAL_SYNC		(DMG_CLOCK_FREQ/SCREEN_REFRESH_CYCLES)
 
-#define FREQ 48000.0f
+#define AUDIO_SAMPLE_RATE 48000.0f
 
 #define AUDIO_MEM_SIZE			(0xFF3F - 0xFF06 + 1)
 #define AUDIO_ADDR_COMPENSATION	0xFF06
@@ -97,7 +97,7 @@ static float hipass(struct chan* c, float sample)
 
 static void set_note_freq(struct chan* c, const float freq)
 {
-	c->freq_inc = freq / FREQ;
+	c->freq_inc = freq / AUDIO_SAMPLE_RATE;
 	c->note = MAX(0, (int)roundf(logf(freq/440.0f) / logbase) + 48);
 }
 
@@ -346,7 +346,7 @@ static void audio_update_rate(void)
 	}
 
 	free(samples);
-	nsamples  = (int)(FREQ / audio_rate) * 2;
+	nsamples  = (int)(AUDIO_SAMPLE_RATE / audio_rate) * 2;
 	samples   = calloc(nsamples, sizeof(float));
 	sample_ptr = samples;
 }
@@ -364,7 +364,7 @@ static void chan_trigger(int i)
 
 		c->env.step    = val & 0x07;
 		c->env.up      = val & 0x08;
-		c->env.inc     = c->env.step ? (64.0f / (float)c->env.step) / FREQ : 8.0f / FREQ;
+		c->env.inc     = c->env.step ? (64.0f / (float)c->env.step) / AUDIO_SAMPLE_RATE : 8.0f / AUDIO_SAMPLE_RATE;
 		c->env.counter = 0.0f;
 	}
 
@@ -376,7 +376,7 @@ static void chan_trigger(int i)
 		c->sweep.rate    = (val >> 4) & 0x07;
 		c->sweep.up      = !(val & 0x08);
 		c->sweep.shift   = (val & 0x07);
-		c->sweep.inc     = c->sweep.rate ? (128.0f / (float)(c->sweep.rate)) / FREQ : 0;
+		c->sweep.inc     = c->sweep.rate ? (128.0f / (float)(c->sweep.rate)) / AUDIO_SAMPLE_RATE : 0;
 		c->sweep.counter = nexttowardf(1.0f, 1.1f);
 	}
 
@@ -390,7 +390,7 @@ static void chan_trigger(int i)
 		c->val = -1;
 	}
 
-	c->len.inc = (256.0f / (float)(len_max - c->len.load)) / FREQ;
+	c->len.inc = (256.0f / (float)(len_max - c->len.load)) / AUDIO_SAMPLE_RATE;
 	c->len.counter = 0.0f;
 }
 
@@ -545,9 +545,9 @@ void audio_init(void)
 	}
 
 	SDL_AudioSpec want = {
-		.freq     = FREQ,
+		.freq     = AUDIO_SAMPLE_RATE,
 		.channels = 2,
-		.samples  = 3000,
+		.samples  = 4096,
 		.format   = AUDIO_F32SYS,
 		.callback = audio_callback,
 	};
