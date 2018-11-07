@@ -1,9 +1,9 @@
+#include "minigbs.h"
+#include "audio.h"
 #include <SDL2/SDL.h>
 #include <errno.h>
 #include <math.h>
 #include <stdlib.h>
-#include "audio.h"
-#include "minigbs.h"
 
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
 #error "Some of the bitfield / casting used in here assumes little endian :("
@@ -13,19 +13,19 @@
 #define VRAM_ADDR 0x8000
 
 struct GBSHeader {
-	char id[3];
-	uint8_t version;
-	uint8_t song_count;
-	uint8_t start_song;
+	char     id[3];
+	uint8_t  version;
+	uint8_t  song_count;
+	uint8_t  start_song;
 	uint16_t load_addr;
 	uint16_t init_addr;
 	uint16_t play_addr;
 	uint16_t sp;
-	uint8_t tma;
-	uint8_t tac;
-	char title[32];
-	char author[32];
-	char copyright[32];
+	uint8_t  tma;
+	uint8_t  tac;
+	char     title[32];
+	char     author[32];
+	char     copyright[32];
 } __attribute__((packed)) GBSHeader;
 
 struct Config {
@@ -74,8 +74,8 @@ struct {
 uint8_t *mem;
 
 static struct GBSHeader h;
-static uint8_t *banks[32];
-static uint8_t *selected_rom_bank;
+static uint8_t *	banks[32];
+static uint8_t *	selected_rom_bank;
 
 static void bank_switch(const uint8_t which)
 {
@@ -113,10 +113,10 @@ static uint8_t mem_read(const uint16_t addr)
 
 static void cpu_step(void)
 {
-	uint8_t op;
-	size_t x;
-	size_t y;
-	size_t z;
+	uint8_t      op;
+	size_t       x;
+	size_t       y;
+	size_t       z;
 	unsigned int cycles = 0;
 
 	if (regs.pc >= ROM_BANK1_ADDR && regs.pc < VRAM_ADDR)
@@ -172,11 +172,11 @@ static void cpu_step(void)
 	};
 
 	// TODO: clean this mess up
-	uint8_t *r[] = { &regs.b, &regs.c, &regs.d,       &regs.e,
-			 &regs.h, &regs.l, mem + regs.hl, &regs.a };
-	static uint16_t *rr[] = { &regs.bc, &regs.de, &regs.hl, &regs.hl };
-	static void *rot[] = { &&op_rlc, &&op_rrc, &&op_rl,   &&op_rr,
-			       &&op_sla, &&op_sra, &&op_swap, &&op_srl };
+	uint8_t *	r[]   = { &regs.b, &regs.c, &regs.d,       &regs.e,
+			   &regs.h, &regs.l, mem + regs.hl, &regs.a };
+	static uint16_t *rr[]  = { &regs.bc, &regs.de, &regs.hl, &regs.hl };
+	static void *    rot[] = { &&op_rlc, &&op_rrc, &&op_rl,   &&op_rr,
+				   &&op_sla, &&op_sra, &&op_swap, &&op_srl };
 	static uint16_t *rp2[] = { &regs.bc, &regs.de, &regs.hl, &regs.af };
 
 	uint8_t alu_val;
@@ -313,7 +313,7 @@ static void cpu_step(void)
 	OP(ld16, 3, 8, { *DD(y >> 1) = NN; });
 
 	OP(addhl, 1, 8, {
-		uint16_t ss = SS(y >> 1);
+		uint16_t ss  = SS(y >> 1);
 		regs.flags.h = (((ss & 0x0FFF) + (regs.hl & 0x0FFF)) &
 				0x1000) == 0x1000;
 		regs.flags.c = __builtin_add_overflow(regs.hl, ss, &regs.hl);
@@ -322,33 +322,33 @@ static void cpu_step(void)
 
 	OP(rlca, 1, 4, {
 		regs.flags.c = regs.a >> 7;
-		regs.a = (regs.a << 1) | regs.flags.c;
+		regs.a       = (regs.a << 1) | regs.flags.c;
 		regs.flags.z = regs.flags.n = regs.flags.h = 0;
 	});
 
 	OP(rrca, 1, 4, {
 		regs.flags.c = regs.a & 1;
-		regs.a = (regs.a >> 1) | regs.flags.c << 7;
+		regs.a       = (regs.a >> 1) | regs.flags.c << 7;
 		regs.flags.z = regs.flags.n = regs.flags.h = 0;
 	});
 
 	OP(rla, 1, 4, {
-		size_t newc = regs.a >> 7;
-		regs.a = (regs.a << 1) | regs.flags.c;
+		size_t newc  = regs.a >> 7;
+		regs.a       = (regs.a << 1) | regs.flags.c;
 		regs.flags.c = newc;
 		regs.flags.z = regs.flags.n = regs.flags.h = 0;
 	});
 
 	OP(rra, 1, 4, {
-		size_t newc = regs.a & 1;
-		regs.a = (regs.a >> 1) | regs.flags.c << 7;
+		size_t newc  = regs.a & 1;
+		regs.a       = (regs.a >> 1) | regs.flags.c << 7;
 		regs.flags.c = newc;
 		regs.flags.z = regs.flags.n = regs.flags.h = 0;
 	});
 
 	OP(daa, 1, 4, {
-		size_t up = regs.a >> 4;
-		size_t dn = regs.a & 0xF;
+		size_t up   = regs.a >> 4;
+		size_t dn   = regs.a & 0xF;
 		size_t newc = 0;
 
 		if (dn >= 10 || regs.flags.h) {
@@ -377,7 +377,7 @@ static void cpu_step(void)
 	});
 
 	OP(cpl, 1, 4, {
-		regs.a = ~regs.a;
+		regs.a       = ~regs.a;
 		regs.flags.h = 1;
 		regs.flags.n = 1;
 	});
@@ -419,7 +419,7 @@ static void cpu_step(void)
 	OP(ldh, 2, 12, { regs.a = mem_read(0xFF00 + mem_read(regs.pc + 1)); });
 
 	OP(ldsp, 2, 12, {
-		regs.hl = regs.sp + (char)mem[regs.pc + 1];
+		regs.hl      = regs.sp + (char)mem[regs.pc + 1];
 		regs.flags.h = regs.flags.n = regs.flags.z = regs.flags.c =
 			0; // XXX: probably wrong
 	});
@@ -463,9 +463,9 @@ static void cpu_step(void)
 
 	OP(cb, 0, 0, {
 		op = mem_read(++regs.pc);
-		x = (op >> 6);
-		y = (op >> 3) & 7;
-		z = op & 7;
+		x  = (op >> 6);
+		y  = (op >> 3) & 7;
+		z  = op & 7;
 
 		cycles += (z == 6) ? 16 : 8;
 		++regs.pc;
@@ -762,7 +762,7 @@ int main(int argc, char **argv)
 
 	regs.sp = h.sp - 2;
 	regs.pc = h.init_addr;
-	regs.a = song_no;
+	regs.a  = song_no;
 
 	mem[0xffff] = 1; // IE
 
@@ -775,13 +775,13 @@ int main(int argc, char **argv)
 	/* Initialise SDL audio. */
 	{
 		SDL_AudioDeviceID audio;
-		SDL_AudioSpec got;
-		SDL_AudioSpec want = {
-			.freq = AUDIO_SAMPLE_RATE,
-			.channels = 2,
-			.samples = 4096,
-			.format = AUDIO_F32SYS,
-			.callback = audio_callback,
+		SDL_AudioSpec     got;
+		SDL_AudioSpec     want = {
+			    .freq     = AUDIO_SAMPLE_RATE,
+			    .channels = 2,
+			    .samples  = 4096,
+			    .format   = AUDIO_F32SYS,
+			    .callback = audio_callback,
 		};
 
 		if (SDL_Init(SDL_INIT_AUDIO) != 0) {
@@ -812,7 +812,7 @@ int main(int argc, char **argv)
 
 		case 'n':
 			if (song_no < h.song_count) {
-				regs.a = ++song_no;
+				regs.a  = ++song_no;
 				regs.sp = h.sp - 2;
 				regs.pc = h.init_addr;
 				fprintf(stdout, "Song %d of %d\n", song_no,
@@ -822,7 +822,7 @@ int main(int argc, char **argv)
 
 		case 'p':
 			if (song_no > 0) {
-				regs.a = --song_no;
+				regs.a  = --song_no;
 				regs.sp = h.sp - 2;
 				regs.pc = h.init_addr;
 				fprintf(stdout, "Song %d of %d\n", song_no,

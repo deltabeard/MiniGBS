@@ -26,47 +26,47 @@
 static uint8_t audio_mem[AUDIO_MEM_SIZE];
 
 struct chan_len_ctr {
-	int load;
-	bool enabled;
+	int   load;
+	bool  enabled;
 	float counter;
 	float inc;
 };
 
 struct chan_vol_env {
-	int step;
-	bool up;
+	int   step;
+	bool  up;
 	float counter;
 	float inc;
 };
 
 struct chan_freq_sweep {
-	int freq;
-	int rate;
-	bool up;
-	int shift;
+	int   freq;
+	int   rate;
+	bool  up;
+	int   shift;
 	float counter;
 	float inc;
 };
 
 static struct chan {
-	int enabled : 1;
-	int on_left : 1;
-	int on_right : 1;
-	int muted : 1;
+	int     enabled : 1;
+	int     on_left : 1;
+	int     on_right : 1;
+	int     muted : 1;
 	uint8_t powered;
 
 	unsigned int volume : 4;
 	unsigned int volume_init : 4;
 
 	uint16_t freq;
-	float freq_counter;
-	float freq_inc;
+	float    freq_counter;
+	float    freq_inc;
 
 	int val;
 	int note;
 
-	struct chan_len_ctr len;
-	struct chan_vol_env env;
+	struct chan_len_ctr    len;
+	struct chan_vol_env    env;
 	struct chan_freq_sweep sweep;
 
 	float capacitor;
@@ -77,8 +77,8 @@ static struct chan {
 
 	// noise
 	uint16_t lfsr_reg;
-	bool lfsr_wide;
-	int lfsr_div;
+	bool     lfsr_wide;
+	int      lfsr_div;
 
 	// wave
 	uint8_t sample;
@@ -93,7 +93,7 @@ static float vol_l, vol_r;
 static float hipass(struct chan *c, float sample)
 {
 #if ENABLE_HIPASS
-	float out = sample - c->capacitor;
+	float out    = sample - c->capacitor;
 	c->capacitor = sample - out * 0.996;
 	return out;
 #else
@@ -104,7 +104,7 @@ static float hipass(struct chan *c, float sample)
 static void set_note_freq(struct chan *c, const float freq)
 {
 	c->freq_inc = freq / AUDIO_SAMPLE_RATE;
-	c->note = MAX(0, (int)roundf(logf(freq / 440.0f)) + 48);
+	c->note     = MAX(0, (int)roundf(logf(freq / 440.0f)) + 48);
 }
 
 static void chan_enable(const unsigned int i, const bool enable)
@@ -151,7 +151,7 @@ static bool update_freq(struct chan *c, float *pos)
 	c->freq_counter += inc;
 
 	if (c->freq_counter > 1.0f) {
-		*pos = c->freq_inc - (c->freq_counter - 1.0f);
+		*pos		= c->freq_inc - (c->freq_counter - 1.0f);
 		c->freq_counter = 0.0f;
 		return true;
 	} else {
@@ -203,9 +203,9 @@ static void update_square(const bool ch2)
 			if (!ch2)
 				update_sweep(c);
 
-			float pos = 0.0f;
+			float pos      = 0.0f;
 			float prev_pos = 0.0f;
-			float sample = 0.0f;
+			float sample   = 0.0f;
 
 			while (update_freq(c, &pos)) {
 				c->duty_counter = (c->duty_counter + 1) & 0b111;
@@ -257,9 +257,9 @@ static void update_wave(void)
 		update_len(c);
 
 		if (c->enabled) {
-			float pos = 0.0f;
+			float pos      = 0.0f;
 			float prev_pos = 0.0f;
-			float sample = 0.0f;
+			float sample   = 0.0f;
 
 			c->sample = wave_sample(c->val, c->volume);
 
@@ -268,7 +268,7 @@ static void update_wave(void)
 				sample += ((pos - prev_pos) / c->freq_inc) *
 					  (float)c->sample;
 				c->sample = wave_sample(c->val, c->volume);
-				prev_pos = pos;
+				prev_pos  = pos;
 			}
 			sample += ((pos - prev_pos) / c->freq_inc) *
 				  (float)c->sample;
@@ -276,7 +276,7 @@ static void update_wave(void)
 			if (c->volume > 0) {
 				float diff = (float[]){ 7.5f, 3.75f,
 							1.5f }[c->volume - 1];
-				sample = hipass(c, (sample - diff) / 7.5f);
+				sample     = hipass(c, (sample - diff) / 7.5f);
 
 				if (!c->muted) {
 					samples[i + 0] += sample * 0.25f *
@@ -309,9 +309,9 @@ static void update_noise(void)
 		if (c->enabled) {
 			update_env(c);
 
-			float pos = 0.0f;
+			float pos      = 0.0f;
 			float prev_pos = 0.0f;
-			float sample = 0.0f;
+			float sample   = 0.0f;
 
 			while (update_freq(c, &pos)) {
 				c->lfsr_reg = (c->lfsr_reg << 1) |
@@ -372,14 +372,14 @@ static void audio_update_rate(void)
 
 	if (tac & 0x04) {
 		const int rates[] = { 4096, 262144, 65536, 16384 };
-		audio_rate = rates[tac & 0x03] / (float)(256 - tma);
+		audio_rate	= rates[tac & 0x03] / (float)(256 - tma);
 		if (tac & 0x80)
 			audio_rate *= 2.0f;
 	}
 
 	free(samples);
-	nsamples = (int)(AUDIO_SAMPLE_RATE / audio_rate) * 2;
-	samples = calloc(nsamples, sizeof(float));
+	nsamples   = (int)(AUDIO_SAMPLE_RATE / audio_rate) * 2;
+	samples    = calloc(nsamples, sizeof(float));
 	sample_ptr = samples;
 }
 
@@ -396,8 +396,8 @@ static void chan_trigger(int i)
 			audio_mem[(0xFF12 + (i * 5)) - AUDIO_ADDR_COMPENSATION];
 
 		c->env.step = val & 0x07;
-		c->env.up = val & 0x08;
-		c->env.inc = c->env.step ? (64.0f / (float)c->env.step) /
+		c->env.up   = val & 0x08;
+		c->env.inc  = c->env.step ? (64.0f / (float)c->env.step) /
 						   AUDIO_SAMPLE_RATE :
 					   8.0f / AUDIO_SAMPLE_RATE;
 		c->env.counter = 0.0f;
@@ -407,11 +407,11 @@ static void chan_trigger(int i)
 	if (i == 0) {
 		uint8_t val = audio_mem[0xFF10 - AUDIO_ADDR_COMPENSATION];
 
-		c->sweep.freq = c->freq;
-		c->sweep.rate = (val >> 4) & 0x07;
-		c->sweep.up = !(val & 0x08);
+		c->sweep.freq  = c->freq;
+		c->sweep.rate  = (val >> 4) & 0x07;
+		c->sweep.up    = !(val & 0x08);
 		c->sweep.shift = (val & 0x07);
-		c->sweep.inc = c->sweep.rate ?
+		c->sweep.inc   = c->sweep.rate ?
 				       (128.0f / (float)(c->sweep.rate)) /
 					       AUDIO_SAMPLE_RATE :
 				       0;
@@ -422,10 +422,10 @@ static void chan_trigger(int i)
 
 	if (i == 2) { // wave
 		len_max = 256;
-		c->val = 0;
+		c->val  = 0;
 	} else if (i == 3) { // noise
 		c->lfsr_reg = 0xFFFF;
-		c->val = -1;
+		c->val      = -1;
 	}
 
 	c->len.inc =
@@ -476,7 +476,7 @@ uint8_t audio_read(const uint16_t addr)
 void audio_write(const uint16_t addr, const uint8_t val)
 {
 	/* Find sound channel corresponding to register address. */
-	int i = (addr - 0xFF10) / 5;
+	int i					  = (addr - 0xFF10) / 5;
 	audio_mem[addr - AUDIO_ADDR_COMPENSATION] = val;
 
 	switch (addr) {
@@ -489,9 +489,10 @@ void audio_write(const uint16_t addr, const uint8_t val)
 	case 0xFF17:
 	case 0xFF21: {
 		chans[i].volume_init = val >> 4;
-		chans[i].powered = val >> 3;
+		chans[i].powered     = val >> 3;
 
-		// "zombie mode" stuff, needed for Prehistorik Man and probably others
+		// "zombie mode" stuff, needed for Prehistorik Man and probably
+		// others
 		if (chans[i].powered && chans[i].enabled) {
 			if ((chans[i].env.step == 0 && chans[i].env.inc != 0)) {
 				if (val & 0x08) {
@@ -516,8 +517,8 @@ void audio_write(const uint16_t addr, const uint8_t val)
 	case 0xFF16:
 	case 0xFF20: {
 		const uint8_t duty_lookup[] = { 0x10, 0x30, 0x3C, 0xCF };
-		chans[i].len.load = val & 0x3f;
-		chans[i].duty = duty_lookup[val >> 6];
+		chans[i].len.load	   = val & 0x3f;
+		chans[i].duty		    = duty_lookup[val >> 6];
 		break;
 	}
 
@@ -550,9 +551,9 @@ void audio_write(const uint16_t addr, const uint8_t val)
 		break;
 
 	case 0xFF22:
-		chans[3].freq = val >> 4;
+		chans[3].freq      = val >> 4;
 		chans[3].lfsr_wide = !(val & 0x08);
-		chans[3].lfsr_div = val & 0x07;
+		chans[3].lfsr_div  = val & 0x07;
 		break;
 
 	case 0xFF24:
@@ -562,7 +563,7 @@ void audio_write(const uint16_t addr, const uint8_t val)
 
 	case 0xFF25:
 		for (int i = 0; i < 4; ++i) {
-			chans[i].on_left = (val >> (4 + i)) & 1;
+			chans[i].on_left  = (val >> (4 + i)) & 1;
 			chans[i].on_right = (val >> i) & 1;
 		}
 		break;
@@ -574,7 +575,7 @@ void audio_init(void)
 	/* Initialise channels and samples. */
 	memset(chans, 0, sizeof(chans));
 	memset(samples, 0, nsamples * sizeof(float));
-	sample_ptr = samples;
+	sample_ptr   = samples;
 	chans[0].val = chans[1].val = -1;
 
 	/* Initialise IO registers. */
