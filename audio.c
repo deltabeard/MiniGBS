@@ -84,7 +84,7 @@ static struct chan {
 	uint8_t sample;
 } chans[4];
 
-static size_t nsamples;
+static unsigned int nsamples;
 static float *samples;
 static float *sample_ptr;
 
@@ -195,7 +195,7 @@ static void update_square(const bool ch2)
 	set_note_freq(c, 4194304.0f / (float)((2048 - c->freq) << 5));
 	c->freq_inc *= 8.0f;
 
-	for (int i = 0; i < nsamples; i += 2) {
+	for (unsigned int i = 0; i < nsamples; i += 2) {
 		update_len(c);
 
 		if (c->enabled) {
@@ -253,7 +253,7 @@ static void update_wave(void)
 
 	c->freq_inc *= 16.0f;
 
-	for (int i = 0; i < nsamples; i += 2) {
+	for (unsigned int i = 0; i < nsamples; i += 2) {
 		update_len(c);
 
 		if (c->enabled) {
@@ -303,7 +303,7 @@ static void update_noise(void)
 	if (c->freq >= 14)
 		c->enabled = false;
 
-	for (int i = 0; i < nsamples; i += 2) {
+	for (unsigned int i = 0; i < nsamples; i += 2) {
 		update_len(c);
 
 		if (c->enabled) {
