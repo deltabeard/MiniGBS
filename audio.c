@@ -85,8 +85,8 @@ static struct chan {
 } chans[4];
 
 static unsigned int nsamples;
-static float *samples;
-static float *sample_ptr;
+static float *      samples;
+static float *      sample_ptr;
 
 static float vol_l, vol_r;
 
@@ -345,7 +345,7 @@ static void update_noise(void)
 	}
 }
 
-void audio_callback(void *ptr, uint8_t *data, int len)
+void audio_callback(void *userdata, uint8_t *stream, int len)
 {
 	len >>= 2;
 
@@ -353,11 +353,11 @@ void audio_callback(void *ptr, uint8_t *data, int len)
 		if (sample_ptr - samples == 0)
 			process_cpu();
 
-		int n = MIN(len, sample_ptr - samples);
-		memcpy(data, samples, n * sizeof(float));
+		unsigned int n = MIN(len, sample_ptr - samples);
+		memcpy(stream, samples, n * sizeof(float));
 		memmove(samples, samples + n, (nsamples - n) * sizeof(float));
 
-		data += (n * 4);
+		stream += (n * 4);
 		sample_ptr -= n;
 		len -= n;
 	} while (len);
