@@ -1,6 +1,6 @@
 SRC		:= minigbs.c audio.c
 OPT		:= -s -Ofast
-CFLAGS	:= $(shell sdl2-config --cflags) -std=gnu99 -Wall
+CFLAGS	:= $(shell sdl2-config --cflags) -std=gnu99 -W -Wall
 LDFLAGS	:= $(shell sdl2-config --libs) -lm
 
 minigbs: $(SRC) minigbs.h

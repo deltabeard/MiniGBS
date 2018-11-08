@@ -543,6 +543,7 @@ void audio_write(const uint16_t addr, const uint8_t val)
 	case 0xFF1E:
 		chans[i].freq &= 0x00FF;
 		chans[i].freq |= ((val & 0x07) << 8);
+		/* Intentional fall-through. */
 	case 0xFF23:
 		chans[i].len.enabled = val & 0x40;
 		if (val & 0x80)
