@@ -677,7 +677,7 @@ void process_cpu(void)
 #ifdef AUDIO_DRIVER_SOKOL
 void sokol_audio_callback(float* buffer, int num_frames, int num_channels)
 {
-	audio_callback(NULL, buffer, num_frames * num_channels);
+	audio_callback(NULL, (uint8_t *)buffer, num_frames * num_channels * sizeof(float));
 }
 #endif
 
