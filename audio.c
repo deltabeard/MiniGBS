@@ -345,8 +345,15 @@ static void update_noise(void)
 	}
 }
 
-void audio_callback(void *userdata, uint8_t *stream, int len)
+/**
+ * SDL2 style audio callback function.
+ */
+void audio_callback(void *restrict const userdata,
+		uint8_t *restrict stream, int len)
 {
+	(void)userdata;
+
+	/* Optimisation: len = len / sizeof(float) */
 	len >>= 2;
 
 	do {
@@ -357,7 +364,7 @@ void audio_callback(void *userdata, uint8_t *stream, int len)
 		memcpy(stream, samples, n * sizeof(float));
 		memmove(samples, samples + n, (nsamples - n) * sizeof(float));
 
-		stream += (n * 4);
+		stream += (n * sizeof(float));
 		sample_ptr -= n;
 		len -= n;
 	} while (len);
