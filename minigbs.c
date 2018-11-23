@@ -1,9 +1,23 @@
 #include "minigbs.h"
 #include "audio.h"
-#include <SDL2/SDL.h>
 #include <errno.h>
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#define AUDIO_DRIVER_SDL	1
+#define AUDIO_DRIVER_SOKOL	2
+#define AUDIO_DRIVER AUDIO_DRIVER_SOKOL
+
+#if AUDIO_DRIVER == AUDIO_DRIVER_SDL
+#include <SDL2/SDL.h>
+#elif AUDIO_DRIVER == AUDIO_DRIVER_SOKOL
+#define SOKOL_IMPL
+#include "sokol_audio.h"
+#else
+#error "No audio driver defined"
+#endif
 
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
 #error "Some of the bitfield / casting used in here assumes little endian :("
@@ -664,6 +678,11 @@ void process_cpu(void)
 	audio_update();
 }
 
+void sokol_audio_callback(float* buffer, int num_frames, int num_channels)
+{
+	audio_callback(NULL, buffer, num_frames * num_channels);
+}
+
 int main(int argc, char **argv)
 {
 	FILE *f;
@@ -772,6 +791,7 @@ int main(int argc, char **argv)
 
 	audio_init();
 
+#if AUDIO_DRIVER == AUDIO_DRIVER_SDL
 	/* Initialise SDL audio. */
 	{
 		SDL_AudioDeviceID audio;
@@ -799,6 +819,18 @@ int main(int argc, char **argv)
 		/* Begin playing audio. */
 		SDL_PauseAudioDevice(audio, 0);
 	}
+#elif AUDIO_DRIVER == AUDIO_DRIVER_SOKOL
+	/* Initialise SOKOL Audio. */
+	{
+		const saudio_desc sd = {
+			.stream_cb = sokol_audio_callback,
+			.sample_rate = AUDIO_SAMPLE_RATE,
+			.num_channels = 2
+
+		};
+		saudio_setup(&sd);
+	}
+#endif
 
 	/* Fixes printf's not printing to stdout until exit in Windows. */
 	setbuf(stdout, NULL);
@@ -831,6 +863,10 @@ int main(int argc, char **argv)
 			break;
 		}
 	}
+
+#if AUDIO_DRIVER == AUDIO_DRIVER_SOKOL
+	saudio_shutdown();
+#endif
 
 	return EXIT_SUCCESS;
 }
