@@ -1,7 +1,7 @@
 .POSIX:
 .SUFFIXES:
 CC = cc
-CFLAGS = -std=gnu99 -W -s -Ofast
+CFLAGS = -std=c99 -Wall -s -Ofast
 LDLIBS = -lm
 
 ifneq ($(findstring SOKOL,$(AUDIO_DRIVER)),)
