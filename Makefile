@@ -1,7 +1,8 @@
 .POSIX:
 .SUFFIXES:
-CC = cc
-CFLAGS = -std=gnu99 -W -s -Ofast
+CC := cc
+OPTIMIZE_FLAG = -s -Ofast
+CFLAGS = -std=gnu99 -Wall -Wextra $(OPTIMIZE_FLAG)
 LDLIBS = -lm
 
 ifneq ($(findstring SOKOL,$(AUDIO_DRIVER)),)
@@ -14,7 +15,7 @@ endif
 
 all: minigbs
 minigbs: minigbs.o audio.o
-	$(CC) $(LDFLAGS) -o minigbs minigbs.o audio.o $(LDLIBS) 
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
 minigbs.o: minigbs.c minigbs.h audio.h sokol_audio.h
 audio.o: audio.c audio.h minigbs.h
 clean:
