@@ -594,8 +594,8 @@ void audio_init(void)
 					      0xFF, 0xFF, 0x00, 0x00, 0x3F,
 					      0x77, 0xF3, 0xF1 };
 
-		memcpy(audio_mem + 0xFF10 - AUDIO_ADDR_COMPENSATION, &regs_init,
-		       sizeof(regs_init));
+		for(unsigned int i = 0; i < sizeof(regs_init); ++i)
+			mem_write(0xFF10 + i, regs_init[i]);
 	}
 
 	/* Initialise Wave Pattern RAM. */

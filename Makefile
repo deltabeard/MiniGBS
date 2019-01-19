@@ -2,7 +2,7 @@
 .SUFFIXES:
 CC := cc
 OPTIMIZE_FLAG = -s -Ofast
-CFLAGS = -std=c99 -pedantic -Wall -Wextra $(OPTIMIZE_FLAG)
+CFLAGS = -Wall -Wextra $(OPTIMIZE_FLAG)
 LDLIBS = -lm
 
 ifneq ($(findstring SOKOL,$(AUDIO_DRIVER)),)
