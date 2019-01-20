@@ -38,10 +38,6 @@ struct GBSHeader {
 	char     copyright[32];
 } __attribute__((packed)) GBSHeader;
 
-struct Config {
-	int song_no;
-} Config;
-
 struct {
 	union {
 		uint16_t af;
@@ -717,7 +713,7 @@ int main(int argc, char **argv)
 		fprintf(stderr,
 			"Error: The selected song index of %d is out of range. "
 			"This file has %d songs.\n",
-			song_no, h.song_count);
+			song_no, h.song_count - 1U);
 		exit(EXIT_FAILURE);
 	}
 
@@ -842,7 +838,7 @@ int main(int argc, char **argv)
 			exit(EXIT_SUCCESS);
 
 		case 'n':
-			if (song_no < h.song_count) {
+			if (song_no < h.song_count - 1U) {
 				regs.a  = ++song_no;
 				regs.sp = h.sp - 2;
 				regs.pc = h.init_addr;
