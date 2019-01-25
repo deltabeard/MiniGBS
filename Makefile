@@ -7,7 +7,11 @@ LDLIBS = -lm
 
 ifeq ($(AUDIO_LIB),SOKOL)
 	CFLAGS += -DAUDIO_DRIVER_SOKOL
-	LDLIBS += -lasound -lpthread
+	ifeq ($(OS),Windows_NT)
+		LDLIBS += -lkernel32 -lole32
+	else
+		LDLIBS += -lasound -lpthread
+	endif
 else
 	CFLAGS += $(shell sdl2-config --cflags) -DAUDIO_DRIVER_SDL
 	LDLIBS += $(shell sdl2-config --libs)
