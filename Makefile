@@ -5,14 +5,26 @@ OPTIMIZE_FLAG = -s -Ofast
 CFLAGS = -Wall -Wextra $(OPTIMIZE_FLAG)
 LDLIBS = -lm
 
+# Default AUDIO_LIB is SDL2
+ifndef AUDIO_LIB
+	AUDIO_LIB = SDL2
+endif
+
 ifeq ($(AUDIO_LIB),SOKOL)
 	CFLAGS += -DAUDIO_DRIVER_SOKOL
+
 	ifeq ($(OS),Windows_NT)
 		LDLIBS += -lkernel32 -lole32
 	else
 		LDLIBS += -lasound -lpthread
 	endif
-else
+endif
+
+ifeq ($(AUDIO_LIB),NONE)
+	CFLAGS += -DAUDIO_DRIVER_NONE
+endif
+
+ifeq ($(AUDIO_LIB),SDL2)
 	CFLAGS += $(shell sdl2-config --cflags) -DAUDIO_DRIVER_SDL
 	LDLIBS += $(shell sdl2-config --libs)
 endif

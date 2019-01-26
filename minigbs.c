@@ -2,8 +2,9 @@
 #include "audio.h"
 #include <errno.h>
 #include <math.h>
-#include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #ifdef AUDIO_DRIVER_SDL
@@ -680,6 +681,7 @@ void sokol_audio_callback(float* buffer, int num_frames, int num_channels)
 int main(int argc, char **argv)
 {
 	FILE *f;
+	unsigned int song_no;
 
 	if (argc != 2 && argc != 3) {
 		fprintf(stderr, "Usage: %s file [song index]\n", argv[0]);
@@ -707,8 +709,11 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	unsigned int song_no = argc > 2 ? atoi(argv[2]) :
-					  MAX(0, h.start_song - 1);
+	/* Get user selected song number to begin playing. */
+	song_no = argc > 2 ? atoi(argv[2]) : MAX(0, h.start_song - 1);
+
+	/* Check that user selected song number is within range of the number of
+	 * songs available in input GBS file. */
 	if (song_no >= h.song_count) {
 		fprintf(stderr,
 			"Error: The selected song index of %d is out of range. "
@@ -719,22 +724,23 @@ int main(int argc, char **argv)
 
 	/* Allocate full Game Boy memory area. */
 	if ((mem = malloc(0x10000)) == NULL) {
-		printf("%d: malloc failure", __LINE__);
+		fprintf(stderr, "Error: malloc failure at %d.\n", __LINE__);
 		exit(EXIT_FAILURE);
 	}
 
 	fseek(f, 0, SEEK_END);
 	fseek(f, 0x70, SEEK_SET);
 
-	unsigned int bno = h.load_addr / 0x4000;
-	unsigned int off = h.load_addr % 0x4000;
+	uint_least8_t bno = h.load_addr / 0x4000;
+	uint_least16_t off = h.load_addr % 0x4000;
 
 	/* Read all ROM banks */
 	while (1) {
 		uint8_t *page;
 
 		if ((page = malloc(0x4000)) == NULL) {
-			printf("%d: malloc failure", __LINE__);
+			fprintf(stderr, "Error: malloc failure at %d.\n",
+					__LINE__);
 			exit(EXIT_FAILURE);
 		}
 
@@ -744,13 +750,14 @@ int main(int argc, char **argv)
 		if (feof(f))
 			break;
 		else if (ferror(f)) {
-			puts("Error reading file");
+			fprintf(stderr, "Error: file read failure at %d.\n",
+					__LINE__);
 			exit(EXIT_FAILURE);
 		}
 
 		off = 0;
 		if (++bno >= 32) {
-			puts("Too many banks in file");
+			fprintf(stderr, "Error: too many banks in GBS file.\n");
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -799,15 +806,17 @@ int main(int argc, char **argv)
 		};
 
 		if (SDL_Init(SDL_INIT_AUDIO) != 0) {
-			fprintf(stderr, "Error calling SDL_Init: %s\n",
+			fprintf(stderr, "Error: SDL_Init failure: %s\n",
 				SDL_GetError());
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 
-		if ((audio = SDL_OpenAudioDevice(NULL, 0, &want, &got, 0)) ==
-		    0) {
-			printf("OpenAudio failed: %s.\n", SDL_GetError());
-			exit(1);
+		if ((audio = SDL_OpenAudioDevice(NULL, 0, &want, &got, 0)) == 0)
+		{
+			fprintf(stderr, "Error: SDL_OpenAudioDevice failure: "
+					"%s.\n",
+					SDL_GetError());
+			exit(EXIT_FAILURE);
 		}
 
 		/* Begin playing audio. */
@@ -835,7 +844,7 @@ int main(int argc, char **argv)
 	while (1) {
 		switch (getchar()) {
 		case 'q':
-			exit(EXIT_SUCCESS);
+			goto out;
 
 		case 'n':
 			if (song_no < h.song_count - 1U) {
@@ -859,9 +868,21 @@ int main(int argc, char **argv)
 		}
 	}
 
+out:
+#ifdef AUDIO_DRIVER_SDL
+	SDL_Quit();
+#endif
 #ifdef AUDIO_DRIVER_SOKOL
 	saudio_shutdown();
 #endif
+
+	audio_deinit();
+
+	do {
+		free(banks[bno]);
+	} while(bno--);
+
+	free(mem);
 
 	return EXIT_SUCCESS;
 }

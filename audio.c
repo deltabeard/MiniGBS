@@ -611,3 +611,11 @@ void audio_init(void)
 
 	audio_update_rate();
 }
+
+void audio_deinit(void)
+{
+	if(samples != NULL)
+		free(samples);
+
+	samples = NULL;
+}
