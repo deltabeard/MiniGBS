@@ -877,7 +877,7 @@ int main(int argc, char **argv)
 				regs.sp = h.sp - 2;
 				regs.pc = h.init_addr;
 				fprintf(stdout, "Song %d of %d\n", song_no,
-					h.song_count);
+					h.song_count - 1U);
 			}
 			break;
 
@@ -887,7 +887,7 @@ int main(int argc, char **argv)
 				regs.sp = h.sp - 2;
 				regs.pc = h.init_addr;
 				fprintf(stdout, "Song %d of %d\n", song_no,
-					h.song_count);
+					h.song_count - 1U);
 			}
 			break;
 		}
