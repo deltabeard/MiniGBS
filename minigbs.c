@@ -9,6 +9,7 @@
 
 #ifdef AUDIO_DRIVER_SDL
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_thread.h>
 #endif
 
 #ifdef AUDIO_DRIVER_SOKOL
@@ -687,6 +688,29 @@ void process_cpu(void)
 	audio_update();
 }
 
+int thread_auto_track(void* priv)
+{
+	uint_least8_t song_no = (uint_least8_t)priv;
+	(void)priv;
+
+	printf("Start thread\n");
+	while(1)
+	{
+		SDL_Delay(1000 * 5);
+		if (song_no < h.song_count - 1U) {
+			regs.a  = ++song_no;
+			regs.sp = h.sp - 2;
+			regs.pc = h.init_addr;
+			fprintf(stdout, "Song %d of %d\n", song_no,
+					h.song_count - 1U);
+		}
+		else
+			break;
+	}
+
+	return 0;
+}
+
 #ifdef AUDIO_DRIVER_SOKOL
 void sokol_audio_callback(float* buffer, int num_frames, int num_channels)
 {
@@ -861,10 +885,13 @@ int main(int argc, char **argv)
 	}
 #endif
 
+	SDL_Thread* threadID = NULL;
+
 	/* Fixes printf's not printing to stdout until exit in Windows. */
 	setbuf(stdout, NULL);
 
-	fprintf(stdout, "Keys: q = Quit, n = Next, p = Previous\n");
+	fprintf(stdout, "Keys: q = Quit, n = Next, p = Previous, "
+			"a = Toggle auto next track\n");
 
 	while (1) {
 		switch (getchar()) {
@@ -890,6 +917,23 @@ int main(int argc, char **argv)
 					h.song_count - 1U);
 			}
 			break;
+		case 'a':
+		{
+			static uint_least8_t auto_track = 0;
+			auto_track = !auto_track;
+
+			if(auto_track)
+			{
+				threadID = SDL_CreateThread(thread_auto_track,
+						"LazyThread", &song_no);
+			}
+			else
+			{
+				//Remove timer in case the call back was not called 
+				SDL_WaitThread(threadID, NULL);
+			}
+		}
+		break;
 		}
 	}
 
