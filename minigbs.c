@@ -97,7 +97,7 @@ static void bank_switch(const uint8_t which)
 		selected_rom_bank = banks[which];
 }
 
-void mem_write(const uint16_t addr, const uint8_t val)
+static void mem_write(const uint16_t addr, const uint8_t val)
 {
 	/* Call audio_write when writing to audio registers. */
 	if (addr >= 0xFF06 && addr <= 0xFF3F)
@@ -113,7 +113,7 @@ void mem_write(const uint16_t addr, const uint8_t val)
 	return;
 }
 
-uint8_t mem_read(const uint16_t addr)
+static uint8_t mem_read(const uint16_t addr)
 {
 	/* Read from ROM Bank 0. */
 	if (addr < 0x4000)

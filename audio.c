@@ -594,8 +594,8 @@ void audio_init(void)
 					      0xFF, 0xFF, 0x00, 0x00, 0x3F,
 					      0x77, 0xF3, 0xF1 };
 
-		for(unsigned int i = 0; i < sizeof(regs_init); ++i)
-			mem_write(0xFF10 + i, regs_init[i]);
+		for(uint_least8_t i = 0; i < sizeof(regs_init); ++i)
+			audio_write(0xFF10 + i, regs_init[i]);
 	}
 
 	/* Initialise Wave Pattern RAM. */
