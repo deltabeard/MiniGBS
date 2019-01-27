@@ -20,8 +20,12 @@
 #error "Some of the bitfield / casting used in here assumes little endian :("
 #endif
 
-#define ROM_BANK1_ADDR 0x4000
-#define VRAM_ADDR 0x8000
+#define ROM_BANK1_ADDR	0x4000
+#define VRAM_ADDR	0x8000
+#define RAM_START_ADDR	0xA000
+#define RAM_STOP_ADDR	0xDFFF
+#define HRAM_START_ADDR	0xFF80
+#define HRAM_STOP_ADDR	0xFFFE
 
 struct GBSHeader {
 	char     id[3];
@@ -79,6 +83,7 @@ struct {
 #define countof(x) (sizeof(x) / sizeof(*x))
 
 uint8_t *mem;
+uint8_t *hram;
 
 static struct GBSHeader h;
 static uint8_t *	banks[32];
@@ -94,28 +99,44 @@ static void bank_switch(const uint8_t which)
 void mem_write(const uint16_t addr, const uint8_t val)
 {
 	/* Call audio_write when writing to audio registers. */
-	if (addr >= 0xFF06 && addr <= 0xFF3F) {
-		mem[addr] = val;
+	if (addr >= 0xFF06 && addr <= 0xFF3F)
 		audio_write(addr, val);
-	}
 	/* Switch ROM banks. */
 	else if (addr >= 0x2000 && addr < ROM_BANK1_ADDR)
 		bank_switch(val);
-	/* Ignore other writes to ROM. */
-	else if (addr < VRAM_ADDR)
-		return;
+	else if (addr >= RAM_START_ADDR && addr <= RAM_STOP_ADDR)
+		mem[addr - RAM_START_ADDR] = val;
+	else if (addr >= HRAM_START_ADDR && addr <= HRAM_STOP_ADDR)
+		hram[addr - HRAM_START_ADDR] = val;
 	else
-		mem[addr] = val;
+	{
+		printf("Unable to write %#04x at address %#06x\n", val, addr);
+		abort();
+	}
+
+	return;
 }
 
-static uint8_t mem_read(const uint16_t addr)
+uint8_t mem_read(const uint16_t addr)
 {
-	if (addr >= 0x4000 && addr <= 0x7FFF)
+	/* Read from ROM Bank 0. */
+	if (addr < 0x4000)
+		return banks[0][addr];
+	/* Read from selected ROM Bank 1. */
+	else if (addr >= 0x4000 && addr <= 0x7FFF)
 		return selected_rom_bank[addr - 0x4000];
+	else if (addr >= RAM_START_ADDR && addr <= RAM_STOP_ADDR)
+		return mem[addr - RAM_START_ADDR];
+	/* Read Audio registers. */
 	else if (addr >= 0xFF06 && addr <= 0xFF3F)
 		return audio_read(addr);
+	else if (addr >= HRAM_START_ADDR && addr <= HRAM_STOP_ADDR)
+		return hram[addr - HRAM_START_ADDR];
 
-	return mem[addr];
+	printf("Unable to read address %#06X\n", addr);
+	abort();
+	/* Catch-all for everything else. */
+	return 0xFF;
 }
 
 static void cpu_step(void)
@@ -129,7 +150,7 @@ static void cpu_step(void)
 	if (regs.pc >= ROM_BANK1_ADDR && regs.pc < VRAM_ADDR)
 		op = selected_rom_bank[regs.pc - ROM_BANK1_ADDR];
 	else
-		op = mem[regs.pc];
+		op = mem_read(regs.pc);
 
 	x = op >> 6;
 	y = (op >> 3) & 7;
@@ -179,8 +200,9 @@ static void cpu_step(void)
 	};
 
 	// TODO: clean this mess up
-	uint8_t *	r[]   = { &regs.b, &regs.c, &regs.d,       &regs.e,
-			   &regs.h, &regs.l, mem + regs.hl, &regs.a };
+	uint8_t *	r[]   = { &regs.b, &regs.c, &regs.d, &regs.e, &regs.h,
+				  &regs.l, mem - RAM_START_ADDR + regs.hl,
+			   	  &regs.a };
 	static uint16_t *rr[]  = { &regs.bc, &regs.de, &regs.hl, &regs.hl };
 	static void *    rot[] = { &&op_rlc, &&op_rrc, &&op_rl,   &&op_rr,
 				   &&op_sla, &&op_sra, &&op_swap, &&op_srl };
@@ -426,7 +448,7 @@ static void cpu_step(void)
 	OP(ldh, 2, 12, { regs.a = mem_read(0xFF00 + mem_read(regs.pc + 1)); });
 
 	OP(ldsp, 2, 12, {
-		regs.hl      = regs.sp + (char)mem[regs.pc + 1];
+		regs.hl      = regs.sp + (char)mem[regs.pc - RAM_START_ADDR + 1];
 		regs.flags.h = regs.flags.n = regs.flags.z = regs.flags.c =
 			0; // XXX: probably wrong
 	});
@@ -723,7 +745,14 @@ int main(int argc, char **argv)
 	}
 
 	/* Allocate full Game Boy memory area. */
-	if ((mem = malloc(0x10000)) == NULL) {
+	mem = malloc((RAM_STOP_ADDR - RAM_START_ADDR) + 1);
+	if (mem == NULL) {
+		fprintf(stderr, "Error: malloc failure at %d.\n", __LINE__);
+		exit(EXIT_FAILURE);
+	}
+
+	hram = malloc((HRAM_STOP_ADDR - HRAM_START_ADDR) + 1);
+	if (hram == NULL) {
 		fprintf(stderr, "Error: malloc failure at %d.\n", __LINE__);
 		exit(EXIT_FAILURE);
 	}
@@ -765,26 +794,20 @@ int main(int argc, char **argv)
 	/* Close input file after loading file. */
 	fclose(f);
 
-	/* Copy data to ROM banks 1 and 2. */
-	if (banks[0])
-		memcpy(mem, banks[0], 0x4000);
-
 	/* Initialising the selected ROM bank to the default of Bank 1. */
 	selected_rom_bank = banks[1];
-
-	/* Initialise the rest of the working memory area. */
-	memset(mem + VRAM_ADDR, 0, 0x8000);
 
 	/* Initialise CPU registers. */
 	memset(&regs, 0, sizeof(regs));
 
-	memcpy(mem, mem + h.load_addr, 0x62);
+	memcpy(banks[0], &banks[0][h.load_addr], 0x62);
 
 	regs.sp = h.sp - 2;
 	regs.pc = h.init_addr;
 	regs.a  = song_no;
 
-	mem[0xffff] = 1; // IE
+	/* TODO: Check if removing this breaks anything. */
+	//mem[0xffff] = 1; // IE
 
 	/* Load timer values from file. */
 	audio_write(0xff06, h.tma);
@@ -883,6 +906,7 @@ out:
 	} while(bno--);
 
 	free(mem);
+	free(hram);
 
 	return EXIT_SUCCESS;
 }
