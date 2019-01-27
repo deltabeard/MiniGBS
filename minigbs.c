@@ -800,7 +800,7 @@ int main(int argc, char **argv)
 		SDL_AudioSpec     want = {
 			    .freq     = AUDIO_SAMPLE_RATE,
 			    .channels = 2,
-			    .samples  = 4096,
+			    .samples  = AUDIO_SAMPLE_RATE / 12U,
 			    .format   = AUDIO_F32SYS,
 			    .callback = audio_callback,
 		};
