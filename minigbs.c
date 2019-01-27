@@ -20,6 +20,7 @@
 #error "Some of the bitfield / casting used in here assumes little endian :("
 #endif
 
+#define ROM_BANK_SIZE	0x4000
 #define ROM_BANK1_ADDR	0x4000
 #define VRAM_ADDR	0x8000
 #define RAM_START_ADDR	0xA000
@@ -108,11 +109,6 @@ void mem_write(const uint16_t addr, const uint8_t val)
 		mem[addr - RAM_START_ADDR] = val;
 	else if (addr >= HRAM_START_ADDR && addr <= HRAM_STOP_ADDR)
 		hram[addr - HRAM_START_ADDR] = val;
-	else
-	{
-		printf("Unable to write %#04x at address %#06x\n", val, addr);
-		abort();
-	}
 
 	return;
 }
@@ -133,8 +129,6 @@ uint8_t mem_read(const uint16_t addr)
 	else if (addr >= HRAM_START_ADDR && addr <= HRAM_STOP_ADDR)
 		return hram[addr - HRAM_START_ADDR];
 
-	printf("Unable to read address %#06X\n", addr);
-	abort();
 	/* Catch-all for everything else. */
 	return 0xFF;
 }
@@ -703,7 +697,7 @@ void sokol_audio_callback(float* buffer, int num_frames, int num_channels)
 int main(int argc, char **argv)
 {
 	FILE *f;
-	unsigned int song_no;
+	uint_least8_t song_no;
 
 	if (argc != 2 && argc != 3) {
 		fprintf(stderr, "Usage: %s file [song index]\n", argv[0]);
@@ -760,21 +754,23 @@ int main(int argc, char **argv)
 	fseek(f, 0, SEEK_END);
 	fseek(f, 0x70, SEEK_SET);
 
-	uint_least8_t bno = h.load_addr / 0x4000;
-	uint_least16_t off = h.load_addr % 0x4000;
+	banks[0] = NULL;
+
+	uint_least8_t bno = h.load_addr / ROM_BANK_SIZE;
+	uint_least16_t off = h.load_addr % ROM_BANK_SIZE;
 
 	/* Read all ROM banks */
 	while (1) {
 		uint8_t *page;
 
-		if ((page = malloc(0x4000)) == NULL) {
+		if ((page = malloc(ROM_BANK_SIZE)) == NULL) {
 			fprintf(stderr, "Error: malloc failure at %d.\n",
 					__LINE__);
 			exit(EXIT_FAILURE);
 		}
 
 		banks[bno] = page;
-		fread(page + off, 1, 0x4000 - off, f);
+		fread(page + off, 1, ROM_BANK_SIZE - off, f);
 
 		if (feof(f))
 			break;
@@ -800,7 +796,13 @@ int main(int argc, char **argv)
 	/* Initialise CPU registers. */
 	memset(&regs, 0, sizeof(regs));
 
-	memcpy(banks[0], &banks[0][h.load_addr], 0x62);
+	if(banks[0] == NULL)
+		banks[0] = malloc(ROM_BANK_SIZE);
+
+	if(h.load_addr >= ROM_BANK1_ADDR)
+		memcpy(banks[0], &banks[1][h.load_addr - ROM_BANK1_ADDR], 0x62);
+	else
+		memcpy(banks[0], &banks[0][h.load_addr], 0x62);
 
 	regs.sp = h.sp - 2;
 	regs.pc = h.init_addr;
