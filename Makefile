@@ -11,8 +11,16 @@ ifeq ($(AUDIO_LIB),SOKOL)
 	else
 		LDLIBS += -lasound -lpthread
 	endif
+
 else ifeq ($(AUDIO_LIB),NONE)
 	CFLAGS += -DAUDIO_DRIVER_NONE
+
+else ifeq ($(AUDIO_LIB), MINIAL)
+	CFLAGS += -DAUDIO_DRIVER_MINIAL
+	ifneq ($(OS), Windows_NT)
+		LDLIBS += -lpthread -lm -ldl
+	endif
+
 else
 	CFLAGS += $(shell sdl2-config --cflags) -DAUDIO_DRIVER_SDL
 	LDLIBS += $(shell sdl2-config --libs)

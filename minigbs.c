@@ -16,6 +16,11 @@
 #include "sokol_audio.h"
 #endif
 
+#ifdef AUDIO_DRIVER_MINIAL
+#define MINI_AL_IMPLEMENTATION
+#include "mini_al.h"
+#endif
+
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
 #error "Some of the bitfield / casting used in here assumes little endian :("
 #endif
@@ -694,6 +699,17 @@ void sokol_audio_callback(float* buffer, int num_frames, int num_channels)
 }
 #endif
 
+#ifdef AUDIO_DRIVER_MINIAL
+mal_uint32 minial_audio_callback(mal_device* pDevice, mal_uint32 frameCount, void* pSamples)
+{
+	const uint_least8_t channels = 2;
+	(void)pDevice;
+
+	audio_callback(NULL, (uint8_t *)pSamples, frameCount * channels * sizeof(float));
+	return frameCount;
+}
+#endif
+
 int main(int argc, char **argv)
 {
 	FILE *f;
@@ -860,6 +876,34 @@ int main(int argc, char **argv)
 		saudio_setup(&sd);
 	}
 #endif
+#ifdef AUDIO_DRIVER_MINIAL
+	mal_device device;
+	mal_context audio_ctx;
+	mal_device_config config;
+
+	{
+		if(mal_context_init(NULL, 0, NULL, &audio_ctx) != MAL_SUCCESS){
+			fprintf(stderr, "mal_context_init failed.\n");
+			exit(1);
+		}
+
+		config = mal_device_config_init_playback(
+				mal_format_f32, 2, AUDIO_SAMPLE_RATE,
+				minial_audio_callback
+		);
+
+		if (mal_device_init(NULL, mal_device_type_playback, NULL, &config, NULL, &device) != MAL_SUCCESS) {
+			printf("Failed to open playback device.\n");
+			return -3;
+		}
+
+		if (mal_device_start(&device) != MAL_SUCCESS) {
+			printf("Failed to start playback device.\n");
+			mal_device_uninit(&device);
+			return -4;
+		}
+	}
+#endif
 
 	/* Fixes printf's not printing to stdout until exit in Windows. */
 	setbuf(stdout, NULL);
@@ -899,6 +943,9 @@ out:
 #endif
 #ifdef AUDIO_DRIVER_SOKOL
 	saudio_shutdown();
+#endif
+#ifdef AUDIO_DRIVER_MINIAL
+	mal_device_uninit(&device);
 #endif
 
 	audio_deinit();
