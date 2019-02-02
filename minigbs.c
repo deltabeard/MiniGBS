@@ -207,7 +207,7 @@ static void cpu_step(void)
 				   &&op_sla, &&op_sra, &&op_swap, &&op_srl };
 	static uint16_t *rp2[] = { &regs.bc, &regs.de, &regs.hl, &regs.af };
 
-	uint8_t alu_val;
+	uint8_t alu_val = 0;
 
 #define R_READ(i)                              \
 	({                                     \
