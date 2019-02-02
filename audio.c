@@ -104,7 +104,7 @@ static float hipass(struct chan *c, float sample)
 static void set_note_freq(struct chan *c, const float freq)
 {
 	c->freq_inc = freq / AUDIO_SAMPLE_RATE;
-	c->note     = MAX(0, (int)roundf(logf(freq / 440.0f)) + 48);
+	c->note     = fmaxf(0.0f, roundf(logf(freq / 440.0f)) + 48.0f);
 }
 
 static void chan_enable(const unsigned int i, const bool enable)

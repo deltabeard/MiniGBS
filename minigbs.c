@@ -85,8 +85,6 @@ struct {
 } regs;
 
 #define MAX(a, b) ({ a > b ? a : b; })
-#define MIN(a, b) ({ a <= b ? a : b; })
-#define countof(x) (sizeof(x) / sizeof(*x))
 
 uint8_t *mem;
 uint8_t *hram;
