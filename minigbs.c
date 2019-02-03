@@ -138,11 +138,10 @@ static uint8_t mem_read(const uint16_t addr)
 
 static void cpu_step(void)
 {
-	uint8_t      op;
-	size_t       x;
-	size_t       y;
-	size_t       z;
-	unsigned int cycles = 0;
+	uint8_t		op;
+	uint_least16_t	x;
+	uint_least16_t	y;
+	uint_least16_t	z;
 
 	if (regs.pc >= ROM_BANK1_ADDR && regs.pc < VRAM_ADDR)
 		op = selected_rom_bank[regs.pc - ROM_BANK1_ADDR];
@@ -244,11 +243,10 @@ static void cpu_step(void)
 #undef ALUY
 #undef OP
 
-#define OP(name, len, cy, code) \
+#define OP(name, len, code)     \
 	op_##name:              \
 	{                       \
 		code;           \
-		cycles += cy;   \
 		regs.pc += len; \
 		goto end;       \
 	}
@@ -258,18 +256,15 @@ static void cpu_step(void)
 #define DD(p) (((uint16_t *)&regs.bc) + (p))
 #define NN ((((uint16_t)mem_read(regs.pc + 2)) << 8) | mem_read(regs.pc + 1))
 
-	OP(mov8, 1, 4, {
+	OP(mov8, 1, {
 		if (z == 6 && y == 6) {
 			puts("HALT?");
 		} else {
-			if (z == 6 || y == 6) {
-				cycles += 4;
-			}
 			R_WRITE(y, R_READ(z));
 		}
 	});
 
-	OP(ldsta16, 1, 8, {
+	OP(ldsta16, 1, {
 		size_t p = y >> 1;
 
 		if (y & 1) {
@@ -284,7 +279,7 @@ static void cpu_step(void)
 			regs.hl--;
 	});
 
-	OP(incdec16, 1, 8, {
+	OP(incdec16, 1, {
 		if (y & 1) {
 			--*DD(y >> 1);
 		} else {
@@ -292,53 +287,50 @@ static void cpu_step(void)
 		}
 	});
 
-	OP(inc8, 1, 4, {
+	OP(inc8, 1, {
 		regs.flags.h = (R_READ(y) & 0xF) == 9;
 		R_WRITE(y, R_READ(y) + 1);
 		regs.flags.z = !R_READ(y);
 		regs.flags.n = 0;
 	});
 
-	OP(dec8, 1, 4, {
+	OP(dec8, 1, {
 		regs.flags.h = (R_READ(y) & 0xF) == 0;
 		R_WRITE(y, R_READ(y) - 1);
 		regs.flags.z = !R_READ(y);
 		regs.flags.n = 1;
 	});
 
-	OP(ld8, 2, 8, {
+	OP(ld8, 2, {
 		R_WRITE(y, mem_read(regs.pc + 1));
-		if (y == 6)
-			cycles += 4;
 	});
 
-	OP(nop, 1, 4,
+	OP(nop, 1,
 	   {
 		   // skip
 	   });
 
-	OP(stsp, 3, 20, {
+	OP(stsp, 3, {
 		mem_write(NN + 1, regs.sp >> 8);
 		mem_write(NN, regs.sp & 0xFF);
 	});
 
-	OP(stop, 2, 4,
+	OP(stop, 2,
 	   {
 		   // skip
 	   });
 
-	OP(jr, 2, 12, { regs.pc += (int8_t)mem_read(regs.pc + 1); });
+	OP(jr, 2, { regs.pc += (int8_t)mem_read(regs.pc + 1); });
 
-	OP(jrcc, 2, 8, {
+	OP(jrcc, 2, {
 		if (CHECKCC(y - 4)) {
 			regs.pc += (int8_t)mem_read(regs.pc + 1);
-			cycles += 4;
 		}
 	});
 
-	OP(ld16, 3, 8, { *DD(y >> 1) = NN; });
+	OP(ld16, 3, { *DD(y >> 1) = NN; });
 
-	OP(addhl, 1, 8, {
+	OP(addhl, 1, {
 		uint16_t ss  = SS(y >> 1);
 		regs.flags.h = (((ss & 0x0FFF) + (regs.hl & 0x0FFF)) &
 				0x1000) == 0x1000;
@@ -346,33 +338,33 @@ static void cpu_step(void)
 		regs.flags.n = 0;
 	});
 
-	OP(rlca, 1, 4, {
+	OP(rlca, 1, {
 		regs.flags.c = regs.a >> 7;
 		regs.a       = (regs.a << 1) | regs.flags.c;
 		regs.flags.z = regs.flags.n = regs.flags.h = 0;
 	});
 
-	OP(rrca, 1, 4, {
+	OP(rrca, 1, {
 		regs.flags.c = regs.a & 1;
 		regs.a       = (regs.a >> 1) | regs.flags.c << 7;
 		regs.flags.z = regs.flags.n = regs.flags.h = 0;
 	});
 
-	OP(rla, 1, 4, {
+	OP(rla, 1, {
 		size_t newc  = regs.a >> 7;
 		regs.a       = (regs.a << 1) | regs.flags.c;
 		regs.flags.c = newc;
 		regs.flags.z = regs.flags.n = regs.flags.h = 0;
 	});
 
-	OP(rra, 1, 4, {
+	OP(rra, 1, {
 		size_t newc  = regs.a & 1;
 		regs.a       = (regs.a >> 1) | regs.flags.c << 7;
 		regs.flags.c = newc;
 		regs.flags.z = regs.flags.n = regs.flags.h = 0;
 	});
 
-	OP(daa, 1, 4, {
+	OP(daa, 1, {
 		size_t up   = regs.a >> 4;
 		size_t dn   = regs.a & 0xF;
 		size_t newc = 0;
@@ -402,37 +394,36 @@ static void cpu_step(void)
 		regs.flags.z = !regs.a;
 	});
 
-	OP(cpl, 1, 4, {
+	OP(cpl, 1, {
 		regs.a       = ~regs.a;
 		regs.flags.h = 1;
 		regs.flags.n = 1;
 	});
 
-	OP(scf, 1, 4, {
+	OP(scf, 1, {
 		regs.flags.c = 1;
 		regs.flags.h = 0;
 		regs.flags.n = 0;
 	});
 
-	OP(ccf, 1, 4, {
+	OP(ccf, 1, {
 		regs.flags.c = !regs.flags.c;
 		regs.flags.h = 0;
 		regs.flags.n = 0;
 	});
 
-	OP(retcc, 1, 8, {
+	OP(retcc, 1, {
 		if (CHECKCC(y)) {
 			regs.pc = ((mem_read(regs.sp + 1) << 8) |
 				   mem_read(regs.sp)) -
 				  1;
 			regs.sp += 2;
-			cycles += 12;
 		}
 	});
 
-	OP(sth, 2, 12, { mem_write(0xFF00 + mem_read(regs.pc + 1), regs.a); });
+	OP(sth, 2, { mem_write(0xFF00 + mem_read(regs.pc + 1), regs.a); });
 
-	OP(addsp, 2, 16, {
+	OP(addsp, 2, {
 		regs.flags.h =
 			(((regs.sp & 0x0FFF) + (mem_read(regs.pc + 1) & 0x0F)) &
 			 0x1000) == 0x1000;
@@ -442,58 +433,56 @@ static void cpu_step(void)
 		regs.flags.z = regs.flags.n = 0;
 	});
 
-	OP(ldh, 2, 12, { regs.a = mem_read(0xFF00 + mem_read(regs.pc + 1)); });
+	OP(ldh, 2, { regs.a = mem_read(0xFF00 + mem_read(regs.pc + 1)); });
 
-	OP(ldsp, 2, 12, {
+	OP(ldsp, 2, {
 		regs.hl      = regs.sp + (char)mem[regs.pc - RAM_START_ADDR + 1];
 		regs.flags.h = regs.flags.n = regs.flags.z = regs.flags.c =
 			0; // XXX: probably wrong
 	});
 
-	OP(pop, 1, 12, {
+	OP(pop, 1, {
 		*rp2[y >> 1] = (mem_read(regs.sp + 1) << 8) | mem_read(regs.sp);
 		regs.sp += 2;
 	});
 
-	OP(ret, 0, 16, {
+	OP(ret, 0, {
 		regs.pc = (mem_read(regs.sp + 1) << 8 | mem_read(regs.sp));
 		regs.sp += 2;
 	});
 
-	OP(reti, 0, 16, {
+	OP(reti, 0, {
 		regs.pc = mem_read(regs.sp + 1) << 8 | mem_read(regs.sp);
 		regs.sp += 2;
 		// XXX: interrupts not implemented
 	});
 
-	OP(jphl, 0, 4, { regs.pc = regs.hl; });
+	OP(jphl, 0, { regs.pc = regs.hl; });
 
-	OP(sphl, 1, 8, { regs.sp = regs.hl; });
+	OP(sphl, 1, { regs.sp = regs.hl; });
 
-	OP(jpcc, 3, 12, {
+	OP(jpcc, 3, {
 		if (CHECKCC(y)) {
 			regs.pc = NN - 3;
-			cycles += 4;
 		}
 	});
 
-	OP(stha, 1, 8, { mem_write(0xFF00 + regs.c, regs.a); });
+	OP(stha, 1, { mem_write(0xFF00 + regs.c, regs.a); });
 
-	OP(st16, 3, 16, { mem_write(NN, regs.a); });
+	OP(st16, 3, { mem_write(NN, regs.a); });
 
-	OP(ldha, 1, 8, { regs.a = mem_read(0xFF00 + regs.c); });
+	OP(ldha, 1, { regs.a = mem_read(0xFF00 + regs.c); });
 
-	OP(lda16, 3, 16, { regs.a = mem_read(NN); });
+	OP(lda16, 3, { regs.a = mem_read(NN); });
 
-	OP(jp, 0, 16, { regs.pc = NN; });
+	OP(jp, 0, { regs.pc = NN; });
 
-	OP(cb, 0, 0, {
+	OP(cb, 0, {
 		op = mem_read(++regs.pc);
 		x  = (op >> 6);
 		y  = (op >> 3) & 7;
 		z  = op & 7;
 
-		cycles += (z == 6) ? 16 : 8;
 		++regs.pc;
 
 		if (x == 0) {
@@ -509,52 +498,51 @@ static void cpu_step(void)
 		}
 	});
 
-	OP(undef, 1, 4,
+	OP(undef, 1,
 	   {
 		   // skip
 	   });
 
-	OP(di, 1, 4,
+	OP(di, 1,
 	   {
 		   // XXX: interrupts not implemented
 	   });
 
-	OP(ei, 1, 4,
+	OP(ei, 1,
 	   {
 		   // XXX: interrupts not implemented
 	   });
 
-	OP(callcc, 3, 12, {
+	OP(callcc, 3, {
 		if (CHECKCC(y)) {
 			mem_write(regs.sp - 1, (regs.pc + 3) >> 8);
 			mem_write(regs.sp - 2, (regs.pc + 3) & 0xFF);
 			regs.sp -= 2;
 			regs.pc = NN - 3;
-			cycles += 12;
 		}
 	});
 
-	OP(push, 1, 16, {
+	OP(push, 1, {
 		mem_write(regs.sp - 2, *rp2[y >> 1] & 0xFF);
 		mem_write(regs.sp - 1, *rp2[y >> 1] >> 8);
 		regs.sp -= 2;
 	});
 
-	OP(call, 0, 24, {
+	OP(call, 0, {
 		mem_write(regs.sp - 1, (regs.pc + 3) >> 8);
 		mem_write(regs.sp - 2, (regs.pc + 3) & 0xFF);
 		regs.sp -= 2;
 		regs.pc = NN;
 	});
 
-	OP(rst, 0, 16, {
+	OP(rst, 0, {
 		mem_write(regs.sp - 1, (regs.pc + 1) >> 8);
 		mem_write(regs.sp - 2, (regs.pc + 1) & 0xFF);
 		regs.pc = h.load_addr + (y * 8);
 		regs.sp -= 2;
 	});
 
-	OP(add, 1, 4, {
+	OP(add, 1, {
 		regs.flags.h = (((regs.a & 0x0F) + (alu_val & 0x0F)) & 0x10) ==
 			       0x10;
 		regs.flags.c = __builtin_add_overflow(regs.a, alu_val, &regs.a);
@@ -562,7 +550,7 @@ static void cpu_step(void)
 		regs.flags.n = 0;
 	});
 
-	OP(adc, 1, 4, {
+	OP(adc, 1, {
 		regs.flags.h =
 			(((regs.a & 0x0F) + (alu_val & 0x0F) + regs.flags.c) &
 			 0x10) == 0x10;
@@ -574,14 +562,14 @@ static void cpu_step(void)
 		regs.flags.n = 0;
 	});
 
-	OP(sub, 1, 4, {
+	OP(sub, 1, {
 		regs.flags.h = (regs.a & 0x0F) < (alu_val & 0x0F);
 		regs.flags.c = __builtin_sub_overflow(regs.a, alu_val, &regs.a);
 		regs.flags.z = regs.a == 0;
 		regs.flags.n = 1;
 	});
 
-	OP(sbc, 1, 4, {
+	OP(sbc, 1, {
 		regs.flags.h = (regs.a & 0x0F) < (alu_val & 0x0F) ||
 			       (regs.a & 0x0F) < regs.flags.c;
 		uint8_t tmp;
@@ -592,26 +580,26 @@ static void cpu_step(void)
 		regs.flags.n = 1;
 	});
 
-	OP(and, 1, 4, {
+	OP(and, 1, {
 		regs.flags.h = 1;
 		regs.flags.n = regs.flags.c = 0;
 		regs.a &= alu_val;
 		regs.flags.z = !regs.a;
 	});
 
-	OP(xor, 1, 4, {
+	OP(xor, 1, {
 		regs.flags.h = regs.flags.n = regs.flags.c = 0;
 		regs.a ^= alu_val;
 		regs.flags.z = !regs.a;
 	});
 
-	OP(or, 1, 4, {
+	OP(or, 1, {
 		regs.flags.h = regs.flags.n = regs.flags.c = 0;
 		regs.a |= alu_val;
 		regs.flags.z = !regs.a;
 	});
 
-	OP(cp, 1, 4, {
+	OP(cp, 1, {
 		uint8_t tmp;
 		regs.flags.h = (regs.a & 0x0F) < (alu_val & 0x0F);
 		regs.flags.c = __builtin_sub_overflow(regs.a, alu_val, &tmp);
@@ -619,21 +607,21 @@ static void cpu_step(void)
 		regs.flags.n = 1;
 	});
 
-	OP(rlc, 0, 0, {
+	OP(rlc, 0, {
 		regs.flags.c = R_READ(z) >> 7;
 		R_WRITE(z, (R_READ(z) << 1) | regs.flags.c);
 		regs.flags.z = !R_READ(z);
 		regs.flags.n = regs.flags.h = 0;
 	});
 
-	OP(rrc, 0, 0, {
+	OP(rrc, 0, {
 		regs.flags.c = R_READ(z) & 1;
 		R_WRITE(z, (R_READ(z) >> 1) | regs.flags.c << 7);
 		regs.flags.z = !R_READ(z);
 		regs.flags.n = regs.flags.h = 0;
 	});
 
-	OP(rl, 0, 0, {
+	OP(rl, 0, {
 		size_t newc = R_READ(z) >> 7;
 		R_WRITE(z, (R_READ(z) << 1) | regs.flags.c);
 		regs.flags.c = newc;
@@ -641,7 +629,7 @@ static void cpu_step(void)
 		regs.flags.n = regs.flags.h = 0;
 	});
 
-	OP(rr, 0, 0, {
+	OP(rr, 0, {
 		size_t newc = R_READ(z) & 1;
 		R_WRITE(z, (R_READ(z) >> 1) | regs.flags.c << 7);
 		regs.flags.c = newc;
@@ -649,28 +637,28 @@ static void cpu_step(void)
 		regs.flags.n = regs.flags.h = 0;
 	});
 
-	OP(sla, 0, 0, {
+	OP(sla, 0, {
 		regs.flags.c = R_READ(z) >> 7;
 		R_WRITE(z, R_READ(z) << 1);
 		regs.flags.z = !R_READ(z);
 		regs.flags.n = regs.flags.h = 0;
 	});
 
-	OP(sra, 0, 0, {
+	OP(sra, 0, {
 		regs.flags.c = R_READ(z) & 1; // ????
 		R_WRITE(z, ((int8_t)R_READ(z)) >> 1);
 		regs.flags.z = !R_READ(z);
 		regs.flags.n = regs.flags.h = 0;
 	});
 
-	OP(swap, 0, 0, {
+	OP(swap, 0, {
 		uint8_t tmp = ((R_READ(z) & 0xF) << 4) | (R_READ(z) >> 4);
 		R_WRITE(z, tmp);
 		regs.flags.z = !R_READ(z);
 		regs.flags.n = regs.flags.h = regs.flags.c = 0;
 	});
 
-	OP(srl, 0, 0, {
+	OP(srl, 0, {
 		regs.flags.c = R_READ(z) & 1;
 		R_WRITE(z, R_READ(z) >> 1);
 		regs.flags.z = !R_READ(z);
