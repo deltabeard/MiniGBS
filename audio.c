@@ -49,11 +49,11 @@ struct chan_freq_sweep {
 };
 
 static struct chan {
-	int     enabled : 1;
-	int     on_left : 1;
-	int     on_right : 1;
-	int     muted : 1;
-	uint8_t powered;
+	unsigned int enabled : 1;
+	unsigned int powered : 1;
+	unsigned int on_left : 1;
+	unsigned int on_right : 1;
+	unsigned int muted : 1;
 
 	unsigned int volume : 4;
 	unsigned int volume_init : 4;
@@ -208,7 +208,7 @@ static void update_square(const bool ch2)
 			float sample   = 0.0f;
 
 			while (update_freq(c, &pos)) {
-				c->duty_counter = (c->duty_counter + 1) & 0b111;
+				c->duty_counter = (c->duty_counter + 1) & 7;
 				sample += ((pos - prev_pos) / c->freq_inc) *
 					  (float)c->val;
 				c->val = (c->duty & (1 << c->duty_counter)) ?
@@ -301,7 +301,7 @@ static void update_noise(void)
 	set_note_freq(c, freq);
 
 	if (c->freq >= 14)
-		c->enabled = false;
+		c->enabled = 0;
 
 	for (unsigned int i = 0; i < nsamples; i += 2) {
 		update_len(c);
@@ -496,7 +496,7 @@ void audio_write(const uint16_t addr, const uint8_t val)
 	case 0xFF17:
 	case 0xFF21: {
 		chans[i].volume_init = val >> 4;
-		chans[i].powered     = val >> 3;
+		chans[i].powered     = (val >> 3) != 0;
 
 		// "zombie mode" stuff, needed for Prehistorik Man and probably
 		// others
@@ -541,7 +541,7 @@ void audio_write(const uint16_t addr, const uint8_t val)
 		break;
 
 	case 0xFF1A:
-		chans[i].powered = val & 0x80;
+		chans[i].powered = (val & 0x80) != 0;
 		chan_enable(i, val & 0x80);
 		break;
 
