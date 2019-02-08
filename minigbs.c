@@ -747,7 +747,7 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	hram = malloc((HRAM_STOP_ADDR - HRAM_START_ADDR) + 1);
+	hram = calloc((HRAM_STOP_ADDR - HRAM_START_ADDR) + 1, 1);
 	if (hram == NULL) {
 		fprintf(stderr, "Error: malloc failure at %d.\n", __LINE__);
 		exit(EXIT_FAILURE);
