@@ -605,8 +605,8 @@ void audio_init(void)
 					      0x2c, 0x04, 0xe5, 0x2c,
 					      0xac, 0xdd, 0xda, 0x48 };
 
-		memcpy(audio_mem + 0xFF30 - AUDIO_ADDR_COMPENSATION, &wave_init,
-		       sizeof(wave_init));
+		for(uint_least8_t i = 0; i < sizeof(wave_init); ++i)
+			audio_write(0xFF30 + i, wave_init[i]);
 	}
 
 	audio_update_rate();

@@ -740,7 +740,7 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	/* Allocate full Game Boy memory area. */
+	/* Allocate required memory space for playing GBS file. */
 	mem = malloc((RAM_STOP_ADDR - RAM_START_ADDR) + 1);
 	if (mem == NULL) {
 		fprintf(stderr, "Error: malloc failure at %d.\n", __LINE__);
