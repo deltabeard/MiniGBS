@@ -823,9 +823,9 @@ int main(int argc, char **argv)
 		SDL_AudioDeviceID audio;
 		SDL_AudioSpec     got;
 		SDL_AudioSpec     want = {
-			    .freq     = AUDIO_SAMPLE_RATE,
+			    .freq     = AUDIO_SAMPLE_RATE_DEFAULT,
 			    .channels = 2,
-			    .samples  = AUDIO_SAMPLE_RATE / 12U,
+			    .samples  = AUDIO_SAMPLE_RATE_DEFAULT / 12U,
 			    .format   = AUDIO_F32SYS,
 			    .callback = audio_callback,
 		};
@@ -836,13 +836,17 @@ int main(int argc, char **argv)
 			exit(EXIT_FAILURE);
 		}
 
-		if ((audio = SDL_OpenAudioDevice(NULL, 0, &want, &got, 0)) == 0)
+		if ((audio = SDL_OpenAudioDevice(NULL, 0, &want, &got,
+				SDL_AUDIO_ALLOW_FREQUENCY_CHANGE)) == 0)
 		{
 			fprintf(stderr, "Error: SDL_OpenAudioDevice failure: "
 					"%s.\n",
 					SDL_GetError());
 			exit(EXIT_FAILURE);
 		}
+
+		audio_set_sample_rate(got.freq);
+		printf("Sample rate: %d\n", got.freq);
 
 		/* Begin playing audio. */
 		SDL_PauseAudioDevice(audio, 0);
@@ -853,7 +857,7 @@ int main(int argc, char **argv)
 	{
 		const saudio_desc sd = {
 			.stream_cb = sokol_audio_callback,
-			.sample_rate = AUDIO_SAMPLE_RATE,
+			.sample_rate = AUDIO_SAMPLE_RATE_DEFAULT,
 			.num_channels = 2
 
 		};
@@ -872,7 +876,7 @@ int main(int argc, char **argv)
 		}
 
 		config = mal_device_config_init_playback(
-				mal_format_f32, 2, AUDIO_SAMPLE_RATE,
+				mal_format_f32, 2, AUDIO_SAMPLE_RATE_DEFAULT,
 				minial_audio_callback
 		);
 

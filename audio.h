@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-#define AUDIO_SAMPLE_RATE 48000.0f
+#define AUDIO_SAMPLE_RATE_DEFAULT 48000
 
 /**
  * Fill allocated buffer "data" with "len" number of 32-bit floating point
@@ -17,6 +17,8 @@ uint8_t audio_read(const uint16_t addr);
  * Write "val" to audio register at given address "addr".
  */
 void audio_write(const uint16_t addr, const uint8_t val);
+
+void audio_set_sample_rate(const uint_least32_t requested_sample_rate);
 
 /**
  * Initialise audio driver.

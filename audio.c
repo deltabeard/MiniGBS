@@ -90,6 +90,8 @@ static float *      sample_ptr;
 
 static float vol_l, vol_r;
 
+static uint_least32_t sample_rate;
+
 static float hipass(struct chan *c, float sample)
 {
 #if ENABLE_HIPASS
@@ -103,7 +105,7 @@ static float hipass(struct chan *c, float sample)
 
 static void set_note_freq(struct chan *c, const float freq)
 {
-	c->freq_inc = freq / AUDIO_SAMPLE_RATE;
+	c->freq_inc = freq / sample_rate;
 	c->note     = fmaxf(0.0f, roundf(logf(freq / 440.0f)) + 48.0f);
 }
 
@@ -402,7 +404,7 @@ static void audio_update_rate(void)
 	}
 
 	free(samples);
-	nsamples   = (int)(AUDIO_SAMPLE_RATE / audio_rate) * 2;
+	nsamples   = (int)(sample_rate / audio_rate) * 2;
 	samples    = calloc(nsamples, sizeof(float));
 	sample_ptr = samples;
 }
@@ -422,8 +424,8 @@ static void chan_trigger(int i)
 		c->env.step = val & 0x07;
 		c->env.up   = val & 0x08;
 		c->env.inc  = c->env.step ? (64.0f / (float)c->env.step) /
-						   AUDIO_SAMPLE_RATE :
-					   8.0f / AUDIO_SAMPLE_RATE;
+						   sample_rate :
+					   8.0f / sample_rate;
 		c->env.counter = 0.0f;
 	}
 
@@ -437,7 +439,7 @@ static void chan_trigger(int i)
 		c->sweep.shift = (val & 0x07);
 		c->sweep.inc   = c->sweep.rate ?
 				       (128.0f / (float)(c->sweep.rate)) /
-					       AUDIO_SAMPLE_RATE :
+					       sample_rate :
 				       0;
 		c->sweep.counter = nexttowardf(1.0f, 1.1f);
 	}
@@ -453,7 +455,7 @@ static void chan_trigger(int i)
 	}
 
 	c->len.inc =
-		(256.0f / (float)(len_max - c->len.load)) / AUDIO_SAMPLE_RATE;
+		(256.0f / (float)(len_max - c->len.load)) / sample_rate;
 	c->len.counter = 0.0f;
 }
 
@@ -583,6 +585,11 @@ void audio_write(const uint16_t addr, const uint8_t val)
 	}
 }
 
+void audio_set_sample_rate(const uint_least32_t requested_sample_rate)
+{
+	sample_rate = requested_sample_rate;
+}
+
 void audio_init(void)
 {
 	/* Initialise channels and samples. */
@@ -614,6 +621,8 @@ void audio_init(void)
 			audio_write(0xFF30 + i, wave_init[i]);
 	}
 
+	/* Initialise sample rate. */
+	sample_rate = AUDIO_SAMPLE_RATE_DEFAULT,
 	audio_update_rate();
 }
 
