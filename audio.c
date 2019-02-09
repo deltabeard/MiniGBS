@@ -345,6 +345,18 @@ static void update_noise(void)
 	}
 }
 
+void audio_update(void)
+{
+	memset(samples, 0, nsamples * sizeof(float));
+
+	update_square(0);
+	update_square(1);
+	update_wave();
+	update_noise();
+
+	sample_ptr = samples + nsamples;
+}
+
 /**
  * SDL2 style audio callback function.
  */
@@ -357,10 +369,15 @@ void audio_callback(void *restrict const userdata,
 	len >>= 2;
 
 	do {
-		if (sample_ptr - samples == 0)
-			process_cpu();
+		unsigned int n;
 
-		unsigned int n = MIN(len, sample_ptr - samples);
+		if (sample_ptr - samples == 0)
+		{
+			process_cpu();
+			audio_update();
+		}
+
+		n = MIN(len, sample_ptr - samples);
 		memcpy(stream, samples, n * sizeof(float));
 		memmove(samples, samples + n, (nsamples - n) * sizeof(float));
 
@@ -438,18 +455,6 @@ static void chan_trigger(int i)
 	c->len.inc =
 		(256.0f / (float)(len_max - c->len.load)) / AUDIO_SAMPLE_RATE;
 	c->len.counter = 0.0f;
-}
-
-void audio_update(void)
-{
-	memset(samples, 0, nsamples * sizeof(float));
-
-	update_square(0);
-	update_square(1);
-	update_wave();
-	update_noise();
-
-	sample_ptr = samples + nsamples;
 }
 
 /**

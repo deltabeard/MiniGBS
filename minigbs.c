@@ -674,8 +674,6 @@ void process_cpu(void)
 
 	regs.pc = h.play_addr;
 	regs.sp -= 2;
-
-	audio_update();
 }
 
 #ifdef AUDIO_DRIVER_SOKOL
