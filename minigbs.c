@@ -7,6 +7,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* TODO: Remove this when f32 and s16 support may be selected at compile time.
+ */
+#if defined(AUDIO_DRIVER_SOKOL) || defined(AUDIO_DRIVER_MINIAL)
+#error Only SDL2 is supported
+#endif
+
 #ifdef AUDIO_DRIVER_SDL
 #include <SDL2/SDL.h>
 #endif
@@ -826,7 +832,8 @@ int main(int argc, char **argv)
 			    .freq     = AUDIO_SAMPLE_RATE,
 			    .channels = 2,
 			    .samples  = AUDIO_SAMPLE_RATE / 12U,
-			    .format   = AUDIO_F32SYS,
+			    //.format   = AUDIO_F32SYS,
+			    .format   = AUDIO_S16,
 			    .callback = audio_callback,
 		};
 

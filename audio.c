@@ -7,7 +7,7 @@
 #include "audio.h"
 #include "minigbs.h"
 
-#define ENABLE_HIPASS 1
+#define ENABLE_HIPASS 0
 
 /* Calculating VSYNC. */
 #define DMG_CLOCK_FREQ 4194304.0
@@ -85,8 +85,8 @@ static struct chan {
 } chans[4];
 
 static unsigned int nsamples;
-static float *      samples;
-static float *      sample_ptr;
+static int16_t *      samples;
+static int16_t *      sample_ptr;
 
 static float vol_l, vol_r;
 
@@ -101,7 +101,7 @@ static float hipass(struct chan *c, float sample)
 #endif
 }
 
-static void set_note_freq(struct chan *c, const float freq)
+static void set_note_freq(struct chan *c, const uint_least32_t freq)
 {
 	c->freq_inc = freq / AUDIO_SAMPLE_RATE;
 	c->note     = fmaxf(0.0f, roundf(logf(freq / 440.0f)) + 48.0f);
@@ -175,8 +175,7 @@ static void update_sweep(struct chan *c)
 				c->enabled = 0;
 			} else {
 				set_note_freq(
-					c, 4194304.0f / (float)((2048 - c->freq)
-								<< 5));
+					c, 4194304 / ((2048 - c->freq) << 5));
 				c->freq_inc *= 8.0f;
 			}
 		} else if (c->sweep.rate) {
@@ -192,7 +191,7 @@ static void update_square(const bool ch2)
 	if (!c->powered)
 		return;
 
-	set_note_freq(c, 4194304.0f / (float)((2048 - c->freq) << 5));
+	set_note_freq(c, 4194304 / ((2048 - c->freq) << 5));
 	c->freq_inc *= 8.0f;
 
 	for (unsigned int i = 0; i < nsamples; i += 2) {
@@ -220,11 +219,14 @@ static void update_square(const bool ch2)
 				  (float)c->val;
 			sample = hipass(c, sample * (c->volume / 15.0f));
 
-			if (!c->muted) {
+			if (!c->muted)
+			{
 				samples[i + 0] +=
-					sample * 0.25f * c->on_left * vol_l;
+					sample * 0.25f * c->on_left * vol_l *
+					32768;
 				samples[i + 1] +=
-					sample * 0.25f * c->on_right * vol_r;
+					sample * 0.25f * c->on_right * vol_r *
+					32768;
 			}
 		}
 	}
@@ -248,7 +250,7 @@ static void update_wave(void)
 	if (!c->powered)
 		return;
 
-	float freq = 4194304.0f / (float)((2048 - c->freq) << 5);
+	float freq = 4194304 / ((2048 - c->freq) << 5);
 	set_note_freq(c, freq);
 
 	c->freq_inc *= 16.0f;
@@ -280,9 +282,11 @@ static void update_wave(void)
 
 				if (!c->muted) {
 					samples[i + 0] += sample * 0.25f *
-							  c->on_left * vol_l;
+							  c->on_left * vol_l *
+							  32768;
 					samples[i + 1] += sample * 0.25f *
-							  c->on_right * vol_r;
+							  c->on_right * vol_r *
+							  32768;
 				}
 			}
 		}
@@ -292,54 +296,63 @@ static void update_wave(void)
 static void update_noise(void)
 {
 	struct chan *c = chans + 3;
+	/* TODO: Find out what this is for. */
+	const uint_least8_t freq_div[] = { 8, 16, 32, 48, 64, 80, 96, 112 };
 	if (!c->powered)
 		return;
 
-	float freq = 4194304.0f / (float)((size_t[]){ 8, 16, 32, 48, 64, 80, 96,
-						      112 }[c->lfsr_div]
-					  << (size_t)c->freq);
+	uint_least32_t freq = 4194304 / (freq_div[c->lfsr_div] << c->freq);
 	set_note_freq(c, freq);
 
 	if (c->freq >= 14)
 		c->enabled = 0;
 
-	for (unsigned int i = 0; i < nsamples; i += 2) {
+	for (uint_least16_t i = 0; i < nsamples; i += 2)
+	{
 		update_len(c);
 
-		if (c->enabled) {
+		if (c->enabled)
+		{
 			update_env(c);
 
 			float pos      = 0.0f;
 			float prev_pos = 0.0f;
 			float sample   = 0.0f;
 
-			while (update_freq(c, &pos)) {
+			while (update_freq(c, &pos))
+			{
 				c->lfsr_reg = (c->lfsr_reg << 1) |
 					      (c->val == 1);
 
-				if (c->lfsr_wide) {
+				if (c->lfsr_wide)
+				{
 					c->val = !(((c->lfsr_reg >> 14) & 1) ^
 						   ((c->lfsr_reg >> 13) & 1)) ?
 							 1 :
 							 -1;
-				} else {
+				}
+				else
+				{
 					c->val = !(((c->lfsr_reg >> 6) & 1) ^
 						   ((c->lfsr_reg >> 5) & 1)) ?
 							 1 :
 							 -1;
 				}
+
 				sample += ((pos - prev_pos) / c->freq_inc) *
 					  c->val;
 				prev_pos = pos;
 			}
+
 			sample += ((pos - prev_pos) / c->freq_inc) * c->val;
 			sample = hipass(c, sample * (c->volume / 15.0f));
 
-			if (!c->muted) {
+			if (!c->muted)
+			{
 				samples[i + 0] +=
-					sample * 0.25f * c->on_left * vol_l;
+					sample * c->on_left * vol_l * 32768 / 4;
 				samples[i + 1] +=
-					sample * 0.25f * c->on_right * vol_r;
+					sample * c->on_right * vol_r * 32768 / 4;
 			}
 		}
 	}
@@ -347,7 +360,7 @@ static void update_noise(void)
 
 void audio_update(void)
 {
-	memset(samples, 0, nsamples * sizeof(float));
+	memset(samples, 0, nsamples * sizeof(int16_t));
 
 	update_square(0);
 	update_square(1);
@@ -366,7 +379,9 @@ void audio_callback(void *restrict const userdata,
 	(void)userdata;
 
 	/* Optimisation: len = len / sizeof(float) */
-	len >>= 2;
+	//len >>= 2;
+	/* Optimisation: len = len / sizeof(int16) */
+	len >>= 1;
 
 	do {
 		unsigned int n;
@@ -378,10 +393,10 @@ void audio_callback(void *restrict const userdata,
 		}
 
 		n = MIN(len, sample_ptr - samples);
-		memcpy(stream, samples, n * sizeof(float));
-		memmove(samples, samples + n, (nsamples - n) * sizeof(float));
+		memcpy(stream, samples, n * sizeof(int16_t));
+		memmove(samples, samples + n, (nsamples - n) * sizeof(int16_t));
 
-		stream += (n * sizeof(float));
+		stream += (n * sizeof(int16_t));
 		sample_ptr -= n;
 		len -= n;
 	} while (len);
@@ -403,7 +418,7 @@ static void audio_update_rate(void)
 
 	free(samples);
 	nsamples   = (int)(AUDIO_SAMPLE_RATE / audio_rate) * 2;
-	samples    = calloc(nsamples, sizeof(float));
+	samples    = calloc(nsamples, sizeof(int16_t));
 	sample_ptr = samples;
 }
 
@@ -587,7 +602,7 @@ void audio_init(void)
 {
 	/* Initialise channels and samples. */
 	memset(chans, 0, sizeof(chans));
-	memset(samples, 0, nsamples * sizeof(float));
+	memset(samples, 0, nsamples * sizeof(int16_t));
 	sample_ptr   = samples;
 	chans[0].val = chans[1].val = -1;
 
