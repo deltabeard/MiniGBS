@@ -61,8 +61,8 @@ struct {
 		struct {
 			union {
 				struct {
-					uint8_t _pad : 4, c : 1, h : 1, n : 1,
-						z : 1;
+					uint8_t _pad : 4,
+						c : 1, h : 1, n : 1, z : 1;
 				};
 				uint8_t all;
 			} flags;
@@ -263,11 +263,8 @@ static void cpu_step(void)
 #define NN ((((uint16_t)mem_read(regs.pc + 2)) << 8) | mem_read(regs.pc + 1))
 
 	OP(mov8, 1, {
-		if (z == 6 && y == 6) {
-			puts("HALT?");
-		} else {
+		if (z != 6 || y != 6)
 			R_WRITE(y, R_READ(z));
-		}
 	});
 
 	OP(ldsta16, 1, {
