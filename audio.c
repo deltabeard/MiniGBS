@@ -360,7 +360,7 @@ static void update_noise(void)
 
 void audio_update(void)
 {
-	memset(samples, 0, nsamples * sizeof(int16_t));
+	memset(samples, 0, nsamples * sizeof(*samples));
 
 	update_square(0);
 	update_square(1);
@@ -378,9 +378,7 @@ void audio_callback(void *restrict const userdata,
 {
 	(void)userdata;
 
-	/* Optimisation: len = len / sizeof(float) */
-	//len >>= 2;
-	/* Optimisation: len = len / sizeof(int16) */
+	/* Optimisation: len = len / sizeof(*samples) */
 	len >>= 1;
 
 	do {
@@ -393,10 +391,10 @@ void audio_callback(void *restrict const userdata,
 		}
 
 		n = MIN(len, sample_ptr - samples);
-		memcpy(stream, samples, n * sizeof(int16_t));
-		memmove(samples, samples + n, (nsamples - n) * sizeof(int16_t));
+		memcpy(stream, samples, n * sizeof(*samples));
+		memmove(samples, samples + n, (nsamples - n) * sizeof(*samples));
 
-		stream += (n * sizeof(int16_t));
+		stream += (n * sizeof(*samples));
 		sample_ptr -= n;
 		len -= n;
 	} while (len);
@@ -418,7 +416,7 @@ static void audio_update_rate(void)
 
 	free(samples);
 	nsamples   = (int)(AUDIO_SAMPLE_RATE / audio_rate) * 2;
-	samples    = calloc(nsamples, sizeof(int16_t));
+	samples    = calloc(nsamples, sizeof(*samples));
 	sample_ptr = samples;
 }
 
@@ -602,7 +600,7 @@ void audio_init(void)
 {
 	/* Initialise channels and samples. */
 	memset(chans, 0, sizeof(chans));
-	memset(samples, 0, nsamples * sizeof(int16_t));
+	memset(samples, 0, nsamples * sizeof(*samples));
 	sample_ptr   = samples;
 	chans[0].val = chans[1].val = -1;
 
