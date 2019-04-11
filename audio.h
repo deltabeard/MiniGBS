@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-#define AUDIO_SAMPLE_RATE 48000.0f
+#define AUDIO_SAMPLE_RATE 32768.0f
 
 /**
  * Fill allocated buffer "data" with "len" number of 32-bit floating point

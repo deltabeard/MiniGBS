@@ -1,6 +1,6 @@
 CC := cc
 OPTIMIZE_FLAG ?= -s -Ofast
-CFLAGS := -Wall -Wextra $(OPTIMIZE_FLAG)
+CFLAGS := -Wall -Wextra -std=gnu11 $(OPTIMIZE_FLAG)
 LDLIBS := -lm
 
 ifndef AUDIO_LIB

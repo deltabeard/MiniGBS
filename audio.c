@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define _SDL_BANNED_RECOMMENDED 1
+#include "banned.h"
+
 #include "audio.h"
 #include "minigbs.h"
 
@@ -391,7 +394,7 @@ void audio_callback(void *restrict const userdata,
 		}
 
 		n = MIN(len, sample_ptr - samples);
-		memcpy(stream, samples, n * sizeof(*samples));
+		memcpy_s(stream, n * sizeof(*samples), samples, n * sizeof(*samples));
 		memmove(samples, samples + n, (nsamples - n) * sizeof(*samples));
 
 		stream += (n * sizeof(*samples));

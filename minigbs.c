@@ -1,5 +1,3 @@
-#include "minigbs.h"
-#include "audio.h"
 #include <errno.h>
 #include <math.h>
 #include <stdint.h>
@@ -30,6 +28,12 @@
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
 #error "Some of the bitfield / casting used in here assumes little endian :("
 #endif
+
+#define _SDL_BANNED_RECOMMENDED 1
+#include "banned.h"
+
+#include "audio.h"
+#include "minigbs.h"
 
 #define ROM_BANK_SIZE	0x4000
 #define ROM_BANK1_ADDR	0x4000
@@ -803,9 +807,9 @@ int main(int argc, char **argv)
 		banks[0] = malloc(ROM_BANK_SIZE);
 
 	if(h.load_addr >= ROM_BANK1_ADDR)
-		memcpy(banks[0], &banks[1][h.load_addr - ROM_BANK1_ADDR], 0x62);
+		memcpy_s(banks[0], ROM_BANK_SIZE, &banks[1][h.load_addr - ROM_BANK1_ADDR], 0x62);
 	else
-		memcpy(banks[0], &banks[0][h.load_addr], 0x62);
+		memcpy_s(banks[0], ROM_BANK_SIZE, &banks[0][h.load_addr], 0x62);
 
 	regs.sp = h.sp - 2;
 	regs.pc = h.init_addr;
