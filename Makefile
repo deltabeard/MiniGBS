@@ -43,7 +43,7 @@ else
 endif
 
 all: audio_lib_check minigbs
-minigbs: minigbs.o audio.o
+minigbs: minigbs.c audio.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
 minigbs.o: minigbs.c minigbs.h audio.h sokol_audio.h
 audio.o: audio.c audio.h minigbs.h

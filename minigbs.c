@@ -88,6 +88,7 @@ struct {
 
 uint8_t *mem;
 uint8_t *hram;
+uint8_t *map;
 
 static struct GBSHeader h;
 static uint8_t *	banks[32];
@@ -102,6 +103,15 @@ static void bank_switch(const uint8_t which)
 
 static void mem_write(const uint16_t addr, const uint8_t val)
 {
+	if(map != NULL)
+	{
+		/* If previously read from address, mark location as good. */
+		if(mem[addr] == 'R' || mem[addr] == 'G')
+			map[addr] = 'G';
+		else
+			map[addr] = 'W';
+	}
+
 	/* Call audio_write when writing to audio registers. */
 	if (addr >= 0xFF06 && addr <= 0xFF3F)
 		audio_write(addr, val);
@@ -118,6 +128,15 @@ static void mem_write(const uint16_t addr, const uint8_t val)
 
 static uint8_t mem_read(const uint16_t addr)
 {
+	if(map != NULL)
+	{
+		/* If previously written to address, mark location as good. */
+		if(mem[addr] == 'R' || mem[addr] == 'G')
+			map[addr] = 'G';
+		else
+			map[addr] = 'R';
+	}
+
 	/* Read from ROM Bank 0. */
 	if (addr < 0x4000)
 		return banks[0][addr];
@@ -699,8 +718,8 @@ int main(int argc, char **argv)
 	FILE *f;
 	uint_least8_t song_no;
 
-	if (argc != 2 && argc != 3) {
-		fprintf(stderr, "Usage: %s file [song index]\n", argv[0]);
+	if (argc < 2 && argc > 4) {
+		fprintf(stderr, "Usage: %s file [song index] [--map]\n", argv[0]);
 		exit(EXIT_FAILURE);
 	}
 
@@ -808,12 +827,21 @@ int main(int argc, char **argv)
 	regs.pc = h.init_addr;
 	regs.a  = song_no;
 
+	/* Dump RAM usage map if requested. */
+	if(argc == 4 && strncmp(argv[3], "--map", 5) == 0)
+	{
+		map = calloc(0xFFFF + 1, sizeof(uint8_t));
+		puts("Dumping map.");
+	}
+	else
+		map = NULL;
+
 	/* TODO: Check if removing this breaks anything. */
 	//mem[0xffff] = 1; // IE
 
 	/* Load timer values from file. */
-	audio_write(0xff06, h.tma);
-	audio_write(0xff07, h.tac);
+	mem_write(0xff06, h.tma);
+	mem_write(0xff07, h.tac);
 
 	audio_init();
 
@@ -931,6 +959,15 @@ out:
 #ifdef AUDIO_DRIVER_MINIAL
 	mal_device_uninit(&device);
 #endif
+
+	if(map != NULL)
+	{
+		FILE *f_map;
+		f_map = fopen("map.bin", "wb");
+		fwrite(map, sizeof(uint8_t), 0xFFFF, f_map);
+		fclose(f_map);
+		free(map);
+	}
 
 	audio_deinit();
 
