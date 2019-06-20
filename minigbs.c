@@ -155,6 +155,42 @@ static uint8_t mem_read(const uint16_t addr)
 	return 0xFF;
 }
 
+static void print_map_stats(void)
+{
+	uint_fast32_t g = 0;
+	uint_fast32_t r = 0;
+	uint_fast32_t w = 0;
+	uint_fast32_t u = 0;
+
+	for(uint8_t *m = (map + RAM_START_ADDR); m < (map + RAM_STOP_ADDR); m++)
+	{
+		switch(*m)
+		{
+			case 'G':
+				g++;
+				break;
+
+			case 'R':
+				r++;
+				break;
+
+			case 'W':
+				w++;
+				break;
+
+			default:
+				u++;
+				break;
+		}
+	}
+
+	printf(	"Used bytes:\t%d\n"
+		"RO bytes:\t%d\n"
+		"WO bytes:\t%d\n"
+		"Unused bytes:\t%d\n",
+			g, r, w, u);
+}
+
 static void cpu_step(void)
 {
 	uint8_t		op;
@@ -972,6 +1008,8 @@ out:
 		f_map = fopen("map.bin", "wb");
 		fwrite(map, sizeof(uint8_t), 0xFFFF, f_map);
 		fclose(f_map);
+
+		print_map_stats();
 		free(map);
 	}
 
