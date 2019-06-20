@@ -106,7 +106,7 @@ static void mem_write(const uint16_t addr, const uint8_t val)
 	if(map != NULL)
 	{
 		/* If previously read from address, mark location as good. */
-		if(mem[addr] == 'R' || mem[addr] == 'G')
+		if(map[addr] == 'R' || map[addr] == 'G')
 			map[addr] = 'G';
 		else
 			map[addr] = 'W';
@@ -131,7 +131,7 @@ static uint8_t mem_read(const uint16_t addr)
 	if(map != NULL)
 	{
 		/* If previously written to address, mark location as good. */
-		if(mem[addr] == 'R' || mem[addr] == 'G')
+		if(map[addr] == 'W' || map[addr] == 'G')
 			map[addr] = 'G';
 		else
 			map[addr] = 'R';
@@ -831,6 +831,12 @@ int main(int argc, char **argv)
 	if(argc == 4 && strncmp(argv[3], "--map", 5) == 0)
 	{
 		map = calloc(0xFFFF + 1, sizeof(uint8_t));
+		if(map == NULL)
+		{
+			printf("Unable to allocate memory for map.\n");
+			exit(EXIT_FAILURE);
+		}
+
 		puts("Dumping map.");
 	}
 	else
