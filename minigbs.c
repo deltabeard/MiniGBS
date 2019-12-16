@@ -491,7 +491,7 @@ static void cpu_step(void)
 	OP(ldh, 2, { regs.a = mem_read(0xFF00 + mem_read(regs.pc + 1)); });
 
 	OP(ldsp, 2, {
-		regs.hl      = regs.sp + (char)mem[regs.pc - RAM_START_ADDR + 1];
+		regs.hl      = regs.sp + mem_read(regs.pc + 1);
 		regs.flags.h = regs.flags.n = regs.flags.z = regs.flags.c =
 			0; // XXX: probably wrong
 	});
