@@ -184,7 +184,7 @@ static void print_map_stats(void)
 		}
 	}
 
-	printf(	"Used bytes:\t%d\n"
+	printf(	"RW bytes:\t%d\n"
 		"RO bytes:\t%d\n"
 		"WO bytes:\t%d\n"
 		"Unused bytes:\t%d\n",
@@ -887,7 +887,7 @@ int main(int argc, char **argv)
 
 	audio_init();
 
-#ifdef AUDIO_DRIVER_SDL
+#if defined(AUDIO_DRIVER_SDL)
 	/* Initialise SDL audio. */
 	{
 		SDL_AudioDeviceID audio;
@@ -917,8 +917,7 @@ int main(int argc, char **argv)
 		/* Begin playing audio. */
 		SDL_PauseAudioDevice(audio, 0);
 	}
-#endif
-#ifdef AUDIO_DRIVER_SOKOL
+#elif defined(AUDIO_DRIVER_SOKOL)
 	/* Initialise SOKOL Audio. */
 	{
 		const saudio_desc sd = {
@@ -929,8 +928,7 @@ int main(int argc, char **argv)
 		};
 		saudio_setup(&sd);
 	}
-#endif
-#ifdef AUDIO_DRIVER_MINIAL
+#elif defined(AUDIO_DRIVER_MINIAL)
 	mal_device device;
 	mal_context audio_ctx;
 	mal_device_config config;
@@ -957,6 +955,10 @@ int main(int argc, char **argv)
 			return -4;
 		}
 	}
+#elif defined(AUDIO_DRIVER_NONE)
+	float *samples = malloc(AUDIO_SAMPLE_RATE * sizeof(float));
+#else
+#error "No audio driver defined."
 #endif
 
 	/* Fixes printf's not printing to stdout until exit in Windows. */
@@ -989,17 +991,20 @@ int main(int argc, char **argv)
 			}
 			break;
 		}
+#if defined(AUDIO_DRIVER_NONE)
+		audio_callback(NULL, (uint8_t *)samples, AUDIO_SAMPLE_RATE * sizeof(float));
+#endif
 	}
 
 out:
-#ifdef AUDIO_DRIVER_SDL
+#if defined(AUDIO_DRIVER_SDL)
 	SDL_Quit();
-#endif
-#ifdef AUDIO_DRIVER_SOKOL
+#elif defined(AUDIO_DRIVER_SOKOL)
 	saudio_shutdown();
-#endif
-#ifdef AUDIO_DRIVER_MINIAL
+#elif defined(AUDIO_DRIVER_MINIAL)
 	mal_device_uninit(&device);
+#elif defined(AUDIO_DRIVER_NONE)
+	free(samples);
 #endif
 
 	if(map != NULL)
