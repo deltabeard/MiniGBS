@@ -599,7 +599,7 @@ void audio_init(void)
 					      0xFF, 0xFF, 0x00, 0x00, 0x3F,
 					      0x77, 0xF3, 0xF1 };
 
-		for(uint_least8_t i = 0; i < sizeof(regs_init); ++i)
+		for(uint_fast8_t i = 0; i < sizeof(regs_init); ++i)
 			audio_write(0xFF10 + i, regs_init[i]);
 	}
 
@@ -610,7 +610,7 @@ void audio_init(void)
 					      0x2c, 0x04, 0xe5, 0x2c,
 					      0xac, 0xdd, 0xda, 0x48 };
 
-		for(uint_least8_t i = 0; i < sizeof(wave_init); ++i)
+		for(uint_fast8_t i = 0; i < sizeof(wave_init); ++i)
 			audio_write(0xFF30 + i, wave_init[i]);
 	}
 
