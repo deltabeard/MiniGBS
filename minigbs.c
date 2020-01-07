@@ -40,20 +40,13 @@ enum gbs_instr_e {
 	GBS_NOP
 };
 
-/* FIXME: This struct should only be 2 bytes, but is actually 5 bytes? */
 struct decoded_gbs_s {
-	union {
-		uint8_t byte;
-		struct {
-			/* 0 for set, 1 for ret. */
-			unsigned instr : 1;
-			/* Address + 0xFF06 */
-			unsigned address : 7;
-		} __attribute__((packed));
-	};
-
+	/* 0 for set, 1 for ret. */
+	unsigned char instr : 1;
+	/* Address + 0xFF06 */
+	unsigned char address : 7;
 	uint8_t value;
-};
+}__attribute__((packed, aligned(1)));
 
 struct record_gbs_ret_s {
 	void *mem;
@@ -123,7 +116,7 @@ static uint8_t *	selected_rom_bank;
 static struct record_gbs_ret_s record_gbs_instr(const enum gbs_instr_e instr,
 		const uint16_t addr, const uint8_t val)
 {
-	static struct __attribute__((packed)) decoded_gbs_s *d = NULL;
+	static struct decoded_gbs_s *d = NULL;
 	static size_t sz = 0;
 
 	if(instr == GBS_NOP)
