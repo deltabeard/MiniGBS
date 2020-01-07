@@ -1,17 +1,10 @@
 CC := cc
-OPTIMIZE_FLAG ?= -s -Ofast
+OPTIMIZE_FLAG ?= -Og -g3
 CFLAGS := -Wall -Wextra $(OPTIMIZE_FLAG)
 LDLIBS := -lm
 
 ifndef AUDIO_LIB
-	# MINIAL is default audio lib on Windows, since no linking to external
-	# libraries is required. Binary will be larger, but release will not
-	# have to be packaged with additional DLL files.
-	ifeq ($(OS),Windows_NT)
-		AUDIO_LIB = MINIAL
-	else
-		AUDIO_LIB = SDL2
-	endif
+	AUDIO_LIB = SDL2
 endif
 
 ifeq ($(AUDIO_LIB), SDL2)

@@ -1,5 +1,6 @@
 #include "minigbs.h"
 #include "audio.h"
+#include <assert.h>
 #include <errno.h>
 #include <math.h>
 #include <stdint.h>
@@ -32,6 +33,32 @@
 #define RAM_STOP_ADDR	0xDFFF
 #define HRAM_START_ADDR	0xFF80
 #define HRAM_STOP_ADDR	0xFFFE
+
+enum gbs_instr_e {
+	GBS_SET_VAL,
+	GBS_RET,
+	GBS_NOP
+};
+
+/* FIXME: This struct should only be 2 bytes, but is actually 5 bytes? */
+struct decoded_gbs_s {
+	union {
+		uint8_t byte;
+		struct {
+			/* 0 for set, 1 for ret. */
+			unsigned instr : 1;
+			/* Address + 0xFF06 */
+			unsigned address : 7;
+		} __attribute__((packed));
+	};
+
+	uint8_t value;
+};
+
+struct record_gbs_ret_s {
+	void *mem;
+	size_t sz;
+};
 
 struct GBSHeader {
 	char     id[3];
@@ -93,6 +120,34 @@ static struct GBSHeader h;
 static uint8_t *	banks[32];
 static uint8_t *	selected_rom_bank;
 
+static struct record_gbs_ret_s record_gbs_instr(const enum gbs_instr_e instr,
+		const uint16_t addr, const uint8_t val)
+{
+	static struct __attribute__((packed)) decoded_gbs_s *d = NULL;
+	static size_t sz = 0;
+
+	if(instr == GBS_NOP)
+		goto out;
+
+	d = realloc(d, (sz + 1) * sizeof(struct decoded_gbs_s));
+
+	/* If instruction isn't "set", set instr to 1. */
+	d[sz].instr = (instr != 0);
+
+	/* Make sure address is positive. */
+	assert((((signed long) addr) - 0xFF06) >= 0);
+	assert(addr <= 0xFF3F);
+	d[sz].address = addr - 0xFF06;
+	d[sz].value = val;
+
+	sz++;
+
+out:
+	;
+	struct record_gbs_ret_s ret = { d, sz };
+	return ret;
+}
+
 static void bank_switch(const uint8_t which)
 {
 	// allowing bank switch to 0 seems to break some games
@@ -104,7 +159,11 @@ static void mem_write(const uint16_t addr, const uint8_t val)
 {
 	/* Call audio_write when writing to audio registers. */
 	if (addr >= 0xFF06 && addr <= 0xFF3F)
+	{
 		audio_write(addr, val);
+		record_gbs_instr(GBS_SET_VAL, addr, val);
+
+	}
 	/* Switch ROM banks. */
 	else if (addr >= 0x2000 && addr < ROM_BANK1_ADDR)
 		bank_switch(val);
@@ -942,6 +1001,17 @@ out:
 	do {
 		free(banks[bno]);
 	} while(bno--);
+
+	{
+		struct record_gbs_ret_s r = record_gbs_instr(GBS_NOP, 0, 0);
+		FILE *dgbs = fopen("dgbs", "wb");
+		fwrite(r.mem, 1, r.sz, dgbs);
+		fclose(dgbs);
+		printf("\nStruct size: %I64d, elements: %I64d\n",
+				sizeof(struct decoded_gbs_s),
+				r.sz / sizeof(struct decoded_gbs_s));
+		free(r.mem);
+	}
 
 	free(mem);
 	free(hram);
