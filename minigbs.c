@@ -4,9 +4,11 @@
 #include <errno.h>
 #include <math.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define _GNU_SOURCE
+#include <stdio.h>
 
 #ifdef AUDIO_DRIVER_SDL
 #include <SDL2/SDL.h>
@@ -35,10 +37,64 @@
 #define HRAM_STOP_ADDR	0xFFFE
 
 enum gbs_instr_e {
-	GBS_SET_VAL,
+	GBS_SET_VAL = 0,
 	GBS_RET,
 	GBS_NOP
 };
+
+/**
+ * Instructions:
+ *
+ * SET	Set 8-bit value v at address offset a.
+ * 	Address is 0xFF06 + a.
+ * 0aaa aaaa vvvv vvvv
+ *
+ * BLK	Block set number n values v starting at address offset a.
+ * 	Only useful for setting 3 or more consecutive addresses.
+ * 10nn nnnn xaaa aaaa vvvv vvvv ...
+ *
+ * STOR	Store the next instruction in memory slot m.
+ * 	Can be used when the same set of instructions are called very
+ * 	frequently. It is expected that a BLK instruction is stored in memory,
+ * 	and therefore, up to 64 bytes may be used at most in each memory slot.
+ * 	Storing to a memory slot overwrites any data previously written to the
+ * 	slot.
+ * 	TODO: Check if 16 memory slots is good or not. Maybe less is better?
+ * 1100 mmmm ...
+ *
+ * CALL	Call instruction at memory slot m.
+ * 	Calling a memory slot with no data is undefined behaviour.
+ * 1101 mmmm
+ *
+ * RET	Returns from code; wait until timer interrupt before continuing.
+ * 1110 xxxx
+ */
+
+/**
+ * pGBS header:
+ *
+ * id is always "pGBS".
+ * version is 0.
+ * mem_required is the total memory required for the STOR instruction used
+ * 	within the track in bytes.
+ * loop_at File offset to start looping from when reached the end of the file.
+ * 	0 for no loop. 1 for first byte of file.
+ * 	Values set to less than 140, that are not 0, is undefined.
+
+struct pGBSHeader {
+	char     id[4];
+	uint8_t  version;
+	uint16_t mem_required;
+	uint16_t loop_at;
+	uint8_t  tma;
+	uint8_t  tac;
+	char     title[32];	// Name of track
+	char     author[32];	// Name of author
+	char     album[32];	// Name of album/game
+	char     copyright[32];	// Copyright License
+} __attribute__((packed)) pGBSHeader;
+
+ */
 
 struct decoded_gbs_s {
 	/* 0 for set, 1 for ret. */
@@ -113,6 +169,8 @@ static struct GBSHeader h;
 static uint8_t *	banks[32];
 static uint8_t *	selected_rom_bank;
 
+static char *instr_txt = NULL;
+
 static struct record_gbs_ret_s record_gbs_instr(const enum gbs_instr_e instr,
 		const uint16_t addr, const uint8_t val)
 {
@@ -127,11 +185,24 @@ static struct record_gbs_ret_s record_gbs_instr(const enum gbs_instr_e instr,
 	/* If instruction isn't "set", set instr to 1. */
 	d[sz].instr = (instr != 0);
 
-	/* Make sure address is positive. */
-	assert((((signed long) addr) - 0xFF06) >= 0);
-	assert(addr <= 0xFF3F);
-	d[sz].address = addr - 0xFF06;
-	d[sz].value = val;
+	if(instr == GBS_SET_VAL)
+	{
+		/* Make sure address is positive. */
+		assert((((signed long) addr) - 0xFF06) >= 0);
+		assert(addr <= 0xFF3F);
+		d[sz].address = addr - 0xFF06;
+		d[sz].value = val;
+
+		asprintf(&instr_txt, "%sSET %#06x %#04x\n",
+				instr_txt != NULL ? instr_txt : "",
+				addr, val);
+	}
+	else
+	{
+		asprintf(&instr_txt, "%sRET\n",
+				instr_txt != NULL ? instr_txt : "");
+	}
+
 
 	sz++;
 
@@ -726,6 +797,9 @@ void process_cpu(void)
 
 	regs.pc = h.play_addr;
 	regs.sp -= 2;
+	/* TODO: Get changes in audio, and record it here.
+	 * This will filter out duplicate changes. */
+	record_gbs_instr(GBS_RET, 0, 0);
 }
 
 #ifdef AUDIO_DRIVER_SOKOL
@@ -1004,6 +1078,10 @@ out:
 				sizeof(struct decoded_gbs_s),
 				r.sz / sizeof(struct decoded_gbs_s));
 		free(r.mem);
+
+		dgbs = fopen("dgbs.txt", "w");
+		fputs(instr_txt, dgbs);
+		fclose(dgbs);
 	}
 
 	free(mem);
