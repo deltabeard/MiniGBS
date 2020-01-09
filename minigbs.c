@@ -198,6 +198,8 @@ static void record_gbs_instr(const enum gbs_instr_e instr, const uint16_t addr,
 
 	assert(pgbs_bin != NULL);
 
+	// TODO: decide best way to organise addresses for faster channel
+	// selection, instead of division by 5.
 	switch(instr)
 	{
 	case GBS_SET_VAL:
