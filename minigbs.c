@@ -1,14 +1,14 @@
 #include "minigbs.h"
 #include "audio.h"
+
+#define _GNU_SOURCE
 #include <assert.h>
 #include <errno.h>
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define _GNU_SOURCE
-#include <stdio.h>
 
 #ifdef AUDIO_DRIVER_SDL
 #include <SDL2/SDL.h>
@@ -204,6 +204,22 @@ static void record_gbs_instr(const enum gbs_instr_e instr, const uint16_t addr,
 		/* Make sure address is positive. */
 		assert((((signed long) addr) - 0xFF06) >= 0);
 		assert(addr <= 0xFF3F);
+		switch(addr)
+		{
+		case 0xFF06 ... 0xFF07:
+		case 0xFF10 ... 0xFF14:
+		case 0xFF16 ... 0xFF19:
+		case 0xFF1A ... 0xFF1E:
+		case 0xFF30 ... 0xFF3F:
+		case 0xFF20 ... 0xFF26:
+			break;
+
+		/* Ignoring invalid addresses. */
+		default:
+			asprintf(&instr_txt, "%sIGN\n",
+				 instr_txt != NULL ? instr_txt : "");
+			return;
+		}
 
 		pgbs_bin[pgbs_bin_sz] = addr - 0xFF06;
 		pgbs_bin[pgbs_bin_sz + 1] = val;
@@ -275,6 +291,7 @@ static uint8_t mem_read(const uint16_t addr)
 	return 0xFF;
 }
 
+#if 1
 static void cpu_step(void)
 {
 	uint8_t		op;
@@ -805,6 +822,7 @@ static void cpu_step(void)
 	});
 end:;
 }
+#endif
 
 void process_cpu(void)
 {
