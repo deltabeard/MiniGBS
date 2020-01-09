@@ -39,7 +39,6 @@
 enum gbs_instr_e {
 	GBS_SET_VAL = 0,
 	GBS_RET,
-	GBS_NOP
 };
 
 /**
@@ -175,47 +174,58 @@ static uint8_t *	selected_rom_bank;
 
 static char *instr_txt = NULL;
 
-static struct record_gbs_ret_s record_gbs_instr(const enum gbs_instr_e instr,
-		const uint16_t addr, const uint8_t val)
+static uint8_t *pgbs_bin = NULL;
+static size_t pgbs_bin_sz = 0;
+
+static void record_gbs_instr(const enum gbs_instr_e instr, const uint16_t addr,
+			     const uint8_t val)
 {
-	static uint8_t *d = NULL;
-	static size_t sz = 0;
+	static size_t pgbs_bin_alloc_sz = 0;
 
-	if(instr == GBS_NOP)
-		goto out;
-
-	/* If instruction isn't "set", set instr to 1. */
-
-	if(instr == GBS_SET_VAL)
+	if(pgbs_bin == NULL)
 	{
+		pgbs_bin = realloc(pgbs_bin, 1000);
+		pgbs_bin_alloc_sz = 1000;
+	}
+
+	/* If running out of memory for instructions, expand allocated memory.
+	 */
+	if((pgbs_bin_alloc_sz - pgbs_bin_sz) < 16)
+	{
+		pgbs_bin_alloc_sz += 1000;
+		pgbs_bin = realloc(pgbs_bin, pgbs_bin_alloc_sz);
+	}
+
+	assert(pgbs_bin != NULL);
+
+	switch(instr)
+	{
+	case GBS_SET_VAL:
 		/* Make sure address is positive. */
 		assert((((signed long) addr) - 0xFF06) >= 0);
 		assert(addr <= 0xFF3F);
 
-		d = realloc(d, sz + 2);
-
-		d[sz] = addr - 0xFF06;
-		d[sz + 1] = val;
+		pgbs_bin[pgbs_bin_sz] = addr - 0xFF06;
+		pgbs_bin[pgbs_bin_sz + 1] = val;
 
 		asprintf(&instr_txt, "%sSET %#06x %#04x\n",
-				instr_txt != NULL ? instr_txt : "",
-				addr, val);
-		sz += 2;
-	}
-	else
-	{
-		d = realloc(d, sz + 1);
-		d[sz] |= 1UL << 7;
+			 instr_txt != NULL ? instr_txt : "",
+			 addr, val);
+		pgbs_bin_sz += 2;
+		break;
+
+	case GBS_RET:
+		pgbs_bin[pgbs_bin_sz] |= 1UL << 7;
 		asprintf(&instr_txt, "%sRET\n",
-				instr_txt != NULL ? instr_txt : "");
-		sz += 1;
+			 instr_txt != NULL ? instr_txt : "");
+		pgbs_bin_sz += 1;
+		break;
+
+	default:
+		abort();
 	}
 
-
-out:
-	;
-	struct record_gbs_ret_s ret = { d, sz };
-	return ret;
+	return;
 }
 
 static void bank_switch(const uint8_t which)
@@ -1081,18 +1091,16 @@ out:
 	} while(bno--);
 
 	{
-		struct record_gbs_ret_s r = record_gbs_instr(GBS_NOP, 0, 0);
 		FILE *dgbs = fopen("dgbs", "wb");
-		fwrite(r.mem, 1, r.sz, dgbs);
+		fwrite(pgbs_bin, 1, pgbs_bin_sz, dgbs);
 		fclose(dgbs);
-		printf("\nStruct size: %I64d, elements: %I64d\n",
-				sizeof(struct decoded_gbs_s),
-				r.sz / sizeof(struct decoded_gbs_s));
-		free(r.mem);
+		printf("\nWrote %ld bytes.\n", pgbs_bin_sz);
+		free(pgbs_bin);
 
 		dgbs = fopen("dgbs.txt", "w");
 		fputs(instr_txt, dgbs);
 		fclose(dgbs);
+		free(instr_txt);
 	}
 
 	free(mem);
