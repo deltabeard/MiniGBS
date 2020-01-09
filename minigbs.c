@@ -51,8 +51,16 @@ enum gbs_instr_e {
  *
  * BLK	Block set number n values v starting at address offset a.
  * 	Only useful for setting 3 or more consecutive addresses.
- * 10nn nnnn xaaa aaaa vvvv vvvv ...
+ * 10nn nnnn 0aaa aaaa vvvv vvvv vvvv vvvv ...
  *
+ * GOTO Goto memory pointed to in slot m. Instructions at slot m must end with
+ * 	RET. Calling a memory slot that doesn't exist is undefined.
+ * 1100 mmmm
+ *
+ * RET	Returns from code; wait until timer interrupt before continuing.
+ * 1101 xxxx
+ *
+ * Rejected:
  * STOR	Store the next instruction in memory slot m.
  * 	Can be used when the same set of instructions are called very
  * 	frequently. It is expected that a BLK instruction is stored in memory,
@@ -65,9 +73,6 @@ enum gbs_instr_e {
  * CALL	Call instruction at memory slot m.
  * 	Calling a memory slot with no data is undefined behaviour.
  * 1101 mmmm
- *
- * RET	Returns from code; wait until timer interrupt before continuing.
- * 1110 xxxx
  */
 
 /**
@@ -75,8 +80,6 @@ enum gbs_instr_e {
  *
  * id is always "pGBS".
  * version is 0.
- * mem_required is the total memory required for the STOR instruction used
- * 	within the track in bytes.
  * loop_at File offset to start looping from when reached the end of the file.
  * 	0 for no loop. 1 for first byte of file.
  * 	Values set to less than 140, that are not 0, is undefined.
@@ -84,7 +87,6 @@ enum gbs_instr_e {
 struct pGBSHeader {
 	char     id[4];
 	uint8_t  version;
-	uint16_t mem_required;
 	uint16_t loop_at;
 	uint8_t  tma;
 	uint8_t  tac;
@@ -92,6 +94,8 @@ struct pGBSHeader {
 	char     author[32];	// Name of author
 	char     album[32];	// Name of album/game
 	char     copyright[32];	// Copyright License
+	uint8_t  common[128];   // Initial RAM containing up to 16 memory slots
+				// each separated by a RET instruction.
 } __attribute__((packed)) pGBSHeader;
 
  */
@@ -109,7 +113,7 @@ struct record_gbs_ret_s {
 	size_t sz;
 };
 
-struct GBSHeader {
+struct GBSHeader_s {
 	char     id[3];
 	uint8_t  version;
 	uint8_t  song_count;
@@ -123,7 +127,7 @@ struct GBSHeader {
 	char     title[32];
 	char     author[32];
 	char     copyright[32];
-} __attribute__((packed)) GBSHeader;
+} __attribute__((packed));
 
 struct {
 	union {
@@ -165,7 +169,7 @@ struct {
 uint8_t *mem;
 uint8_t *hram;
 
-static struct GBSHeader h;
+static struct GBSHeader_s h;
 static uint8_t *	banks[32];
 static uint8_t *	selected_rom_bank;
 
@@ -915,6 +919,11 @@ int main(int argc, char **argv)
 
 	/* Close input file after loading file. */
 	fclose(f);
+
+	printf("Title: %s\n"
+		"Author: %s\n"
+		"Copyright: %s\n",
+		h.title, h.author, h.copyright);
 
 	/* Initialising the selected ROM bank to the default of Bank 1. */
 	selected_rom_bank = banks[1];
