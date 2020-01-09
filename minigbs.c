@@ -101,11 +101,11 @@ struct pGBSHeader {
  */
 
 struct decoded_gbs_s {
-	/* 0 for set, 1 for ret. */
-	unsigned char instr : 1;
+	uint8_t value;
 	/* Address + 0xFF06 */
 	unsigned char address : 7;
-	uint8_t value;
+	/* 0 for set, 1 for ret. */
+	unsigned char instr : 1;
 }__attribute__((packed, aligned(1)));
 
 struct record_gbs_ret_s {
@@ -178,37 +178,39 @@ static char *instr_txt = NULL;
 static struct record_gbs_ret_s record_gbs_instr(const enum gbs_instr_e instr,
 		const uint16_t addr, const uint8_t val)
 {
-	static struct decoded_gbs_s *d = NULL;
+	static uint8_t *d = NULL;
 	static size_t sz = 0;
 
 	if(instr == GBS_NOP)
 		goto out;
 
-	d = realloc(d, (sz + 1) * sizeof(struct decoded_gbs_s));
-
 	/* If instruction isn't "set", set instr to 1. */
-	d[sz].instr = (instr != 0);
 
 	if(instr == GBS_SET_VAL)
 	{
 		/* Make sure address is positive. */
 		assert((((signed long) addr) - 0xFF06) >= 0);
 		assert(addr <= 0xFF3F);
-		d[sz].address = addr - 0xFF06;
-		d[sz].value = val;
+
+		d = realloc(d, sz + 2);
+
+		d[sz] = addr - 0xFF06;
+		d[sz + 1] = val;
 
 		asprintf(&instr_txt, "%sSET %#06x %#04x\n",
 				instr_txt != NULL ? instr_txt : "",
 				addr, val);
+		sz += 2;
 	}
 	else
 	{
+		d = realloc(d, sz + 1);
+		d[sz] |= 1UL << 7;
 		asprintf(&instr_txt, "%sRET\n",
 				instr_txt != NULL ? instr_txt : "");
+		sz += 1;
 	}
 
-
-	sz++;
 
 out:
 	;
