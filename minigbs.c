@@ -173,6 +173,8 @@ static uint8_t *	banks[32];
 static uint8_t *	selected_rom_bank;
 
 static char *instr_txt = NULL;
+static size_t instr_txt_sz = 0;
+static size_t instr_txt_alloc_sz = 0;
 
 static uint8_t *pgbs_bin = NULL;
 static size_t pgbs_bin_sz = 2;
@@ -189,12 +191,24 @@ static void record_gbs_instr(const enum gbs_instr_e instr, const uint16_t addr,
 		pgbs_bin = realloc(pgbs_bin, pgbs_bin_alloc_sz);
 	}
 
+	if(instr_txt == NULL || (instr_txt_alloc_sz - instr_txt_sz) < 128)
+	{
+		instr_txt_alloc_sz += 1000;
+		instr_txt = realloc(instr_txt, instr_txt_alloc_sz);
+	}
+
+	if(instr_txt_sz == 0)
+		instr_txt[0] = '\0';
+
 	assert(pgbs_bin != NULL);
+	assert(instr_txt != NULL);
 
 	// TODO: decide best way to organise addresses for faster channel
 	// selection, instead of division by 5.
 	switch(instr)
 	{
+		static char instr_str[32];
+
 	case GBS_SET_VAL:
 		/* Make sure address is positive. */
 		assert((((signed long) addr) - 0xFF06) >= 0);
@@ -211,25 +225,28 @@ static void record_gbs_instr(const enum gbs_instr_e instr, const uint16_t addr,
 
 		/* Ignoring invalid addresses. */
 		default:
-			asprintf(&instr_txt, "%sIGN\n",
-				 instr_txt != NULL ? instr_txt : "");
+			strcat(instr_txt, "IGN\n");
+			instr_txt_sz += 4;
 			return;
 		}
 
 		pgbs_bin[pgbs_bin_sz] = addr - 0xFF06;
 		pgbs_bin[pgbs_bin_sz + 1] = val;
-
-		asprintf(&instr_txt, "%sSET %#06x %#04x\n",
-			 instr_txt != NULL ? instr_txt : "",
-			 addr, val);
 		pgbs_bin_sz += 2;
+
+		sprintf(instr_str, "SET %#06x %#04x\n", addr, val);
+		strcat(instr_txt, instr_str);
+		instr_txt_sz += strlen(instr_str);
+
 		break;
 
 	case GBS_RET:
 		pgbs_bin[pgbs_bin_sz] |= 1UL << 7;
-		asprintf(&instr_txt, "%sRET\n",
-			 instr_txt != NULL ? instr_txt : "");
 		pgbs_bin_sz += 1;
+
+		strcat(instr_txt, "RET\n");
+		instr_txt_sz += 4;
+
 		break;
 
 	default:
