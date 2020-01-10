@@ -175,19 +175,12 @@ static uint8_t *	selected_rom_bank;
 static char *instr_txt = NULL;
 
 static uint8_t *pgbs_bin = NULL;
-static size_t pgbs_bin_sz = 0;
+static size_t pgbs_bin_sz = 2;
+static size_t pgbs_bin_alloc_sz = 0;
 
 static void record_gbs_instr(const enum gbs_instr_e instr, const uint16_t addr,
 			     const uint8_t val)
 {
-	static size_t pgbs_bin_alloc_sz = 0;
-
-	if(pgbs_bin == NULL)
-	{
-		pgbs_bin = realloc(pgbs_bin, 1000);
-		pgbs_bin_alloc_sz = 1000;
-	}
-
 	/* If running out of memory for instructions, expand allocated memory.
 	 */
 	if((pgbs_bin_alloc_sz - pgbs_bin_sz) < 16)
@@ -982,6 +975,10 @@ int main(int argc, char **argv)
 	audio_write(0xff06, h.tma);
 	audio_write(0xff07, h.tac);
 
+	pgbs_bin = realloc(pgbs_bin, 1000);
+	pgbs_bin_alloc_sz = 1000;
+	pgbs_bin[0] = h.tma;
+	pgbs_bin[1] = h.tac;
 	audio_init();
 
 #if defined(AUDIO_DRIVER_SDL)
