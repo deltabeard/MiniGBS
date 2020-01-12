@@ -211,7 +211,7 @@ static void record_gbs_instr(const enum gbs_instr_e instr, const uint16_t addr,
 
 	case GBS_SET_VAL:
 		/* Make sure address is positive. */
-		assert((((signed long) addr) - 0xFF06) >= 0);
+		assert((((signed long) addr) - 0xFF00) >= 0);
 		assert(addr <= 0xFF3F);
 		switch(addr)
 		{
@@ -230,7 +230,7 @@ static void record_gbs_instr(const enum gbs_instr_e instr, const uint16_t addr,
 			return;
 		}
 
-		pgbs_bin[pgbs_bin_sz] = addr - 0xFF06;
+		pgbs_bin[pgbs_bin_sz] = addr - 0xFF00;
 		pgbs_bin[pgbs_bin_sz + 1] = val;
 		pgbs_bin_sz += 2;
 
