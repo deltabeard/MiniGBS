@@ -180,6 +180,9 @@ static uint8_t *pgbs_bin = NULL;
 static size_t pgbs_bin_sz = 2;
 static size_t pgbs_bin_alloc_sz = 0;
 
+#define AUDIO_MEM_SIZE (0xFF3F - 0xFF00 + 1)
+static uint8_t audio_mem_current[AUDIO_MEM_SIZE];
+
 static void record_gbs_instr(const enum gbs_instr_e instr, const uint16_t addr,
 			     const uint8_t val)
 {
@@ -203,12 +206,12 @@ static void record_gbs_instr(const enum gbs_instr_e instr, const uint16_t addr,
 	assert(pgbs_bin != NULL);
 	assert(instr_txt != NULL);
 
+	static char instr_str[32];
+
 	// TODO: decide best way to organise addresses for faster channel
 	// selection, instead of division by 5.
 	switch(instr)
 	{
-		static char instr_str[32];
-
 	case GBS_SET_VAL:
 		/* Make sure address is positive. */
 		assert((((signed long) addr) - 0xFF00) >= 0);
@@ -269,8 +272,20 @@ static void mem_write(const uint16_t addr, const uint8_t val)
 	if (addr >= 0xFF06 && addr <= 0xFF3F)
 	{
 		audio_write(addr, val);
-		record_gbs_instr(GBS_SET_VAL, addr, val);
+		audio_mem_current[addr - 0xFF00] = val;
 
+		/* Always set "Initial" and Channel Control registers. */
+		switch(addr)
+		{
+			case 0x14:
+			case 0x19:
+			case 0x1E:
+			case 0x23:
+			case 0x24:
+			case 0x25:
+				record_gbs_instr(GBS_SET_VAL, addr, val);
+				break;
+		}
 	}
 	/* Switch ROM banks. */
 	else if (addr >= 0x2000 && addr < ROM_BANK1_ADDR)
@@ -838,14 +853,39 @@ end:;
 
 void process_cpu(void)
 {
+	static unsigned int first_ret = 0;
+	static uint8_t audio_mem_last[AUDIO_MEM_SIZE];
+	memcpy(audio_mem_last, audio_mem_current, AUDIO_MEM_SIZE);
+
 	while (regs.sp != h.sp)
 		cpu_step();
 
 	regs.pc = h.play_addr;
 	regs.sp -= 2;
-	/* TODO: Get changes in audio, and record it here.
-	 * This will filter out duplicate changes. */
+
+	static uint8_t valid_audio_regs[] = {
+		0x06, 0x07,
+		0x10, 0x11, 0x12, 0x14,
+		0x16, 0x17, 0x18, 0x19,
+		0x1A, 0x1B, 0x1C, 0x1D, 0x1E,
+		0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39,
+		0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F,
+		0x20, 0x21, 0x22, 0x23,
+		0x24, 0x25, 0x26
+	};
+
+	/* Find changes in audio registers. */
+	for(uint_least8_t i = 0; i < sizeof(valid_audio_regs); i++)
+	{
+		if(first_ret == 0 || audio_mem_last[i] != audio_mem_current[i])
+		{
+			record_gbs_instr(GBS_SET_VAL, i + 0xFF00,
+					 audio_mem_current[i]);
+		}
+	}
+
 	record_gbs_instr(GBS_RET, 0, 0);
+	first_ret = 1;
 }
 
 #ifdef AUDIO_DRIVER_SOKOL
