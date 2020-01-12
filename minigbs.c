@@ -929,9 +929,12 @@ int main(int argc, char **argv)
 {
 	FILE *f;
 	uint_least8_t song_no;
+	unsigned long play_time = 0;
 
-	if (argc != 2 && argc != 3) {
-		fprintf(stderr, "Usage: %s file [song index]\n", argv[0]);
+	if (argc != 2 && argc != 3 && argc != 4)
+	{
+		fprintf(stderr, "Usage: %s file [song index] [play time]\n",
+argv[0]);
 		exit(EXIT_FAILURE);
 	}
 
@@ -958,6 +961,9 @@ int main(int argc, char **argv)
 
 	/* Get user selected song number to begin playing. */
 	song_no = argc > 2 ? atoi(argv[2]) : MAX(0, h.start_song - 1);
+
+	if(argc == 4)
+		play_time = atoi(argv[3]);
 
 	/* Check that user selected song number is within range of the number of
 	 * songs available in input GBS file. */
@@ -1127,6 +1133,7 @@ int main(int argc, char **argv)
 	}
 #elif defined(AUDIO_DRIVER_NONE)
 	float *samples = malloc(AUDIO_SAMPLE_RATE * sizeof(float));
+	unsigned long sec = 0;
 #else
 #error "No audio driver defined."
 #endif
@@ -1138,10 +1145,12 @@ int main(int argc, char **argv)
 
 	puts("CTRL+C or SIGINT to exit.");
 
-	while (keepRunning)
+	while (keepRunning && (play_time == 0 || sec < play_time))
 	{
 #if defined(AUDIO_DRIVER_NONE)
-		audio_callback(NULL, (uint8_t *)samples, AUDIO_SAMPLE_RATE * sizeof(float));
+		audio_callback(NULL, (uint8_t *)samples, AUDIO_SAMPLE_RATE *
+sizeof(float));
+		sec++;
 #endif
 	}
 
