@@ -11,12 +11,12 @@ void audio_callback(void *ptr, uint8_t *data, int len);
 /**
  * Read audio register at given address "addr".
  */
-uint8_t audio_read(const uint16_t addr);
+uint8_t audio_read(const uint8_t addr);
 
 /**
  * Write "val" to audio register at given address "addr".
  */
-void audio_write(const uint16_t addr, const uint8_t val);
+void audio_write(const uint8_t addr, const uint8_t val);
 
 /**
  * Initialise audio driver.

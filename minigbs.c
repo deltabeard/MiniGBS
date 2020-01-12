@@ -271,14 +271,20 @@ static void mem_write(const uint16_t addr, const uint8_t val)
 	/* Call audio_write when writing to audio registers. */
 	if (addr >= 0xFF06 && addr <= 0xFF3F)
 	{
-		audio_write(addr, val);
 		audio_mem_current[addr - 0xFF00] = val;
+		if(audio_read(addr - 0xFF00) != val)
+			record_gbs_instr(GBS_SET_VAL, addr, val);
 
+		audio_write(addr - 0xFF00, val);
+#if 0
 		/* Always set "Initial" and Channel Control registers. */
 		switch(addr)
 		{
+			case 0x12:
 			case 0x14:
+			case 0x17:
 			case 0x19:
+			case 0x1A:
 			case 0x1E:
 			case 0x23:
 			case 0x24:
@@ -286,6 +292,7 @@ static void mem_write(const uint16_t addr, const uint8_t val)
 				record_gbs_instr(GBS_SET_VAL, addr, val);
 				break;
 		}
+#endif
 	}
 	/* Switch ROM banks. */
 	else if (addr >= 0x2000 && addr < ROM_BANK1_ADDR)
@@ -310,7 +317,7 @@ static uint8_t mem_read(const uint16_t addr)
 		return mem[addr - RAM_START_ADDR];
 	/* Read Audio registers. */
 	else if (addr >= 0xFF06 && addr <= 0xFF3F)
-		return audio_read(addr);
+		return audio_read(addr - 0xFF00);
 	else if (addr >= HRAM_START_ADDR && addr <= HRAM_STOP_ADDR)
 		return hram[addr - HRAM_START_ADDR];
 
@@ -863,6 +870,7 @@ void process_cpu(void)
 	regs.pc = h.play_addr;
 	regs.sp -= 2;
 
+#if 0
 	static uint8_t valid_audio_regs[] = {
 		0x06, 0x07,
 		0x10, 0x11, 0x12, 0x14,
@@ -883,6 +891,7 @@ void process_cpu(void)
 					 audio_mem_current[i]);
 		}
 	}
+#endif
 
 	record_gbs_instr(GBS_RET, 0, 0);
 	first_ret = 1;
@@ -1029,8 +1038,8 @@ int main(int argc, char **argv)
 	//mem[0xffff] = 1; // IE
 
 	/* Load timer values from file. */
-	audio_write(0xff06, h.tma);
-	audio_write(0xff07, h.tac);
+	audio_write(0x06, h.tma);
+	audio_write(0x07, h.tac);
 
 	pgbs_bin = realloc(pgbs_bin, 1000);
 	pgbs_bin_alloc_sz = 1000;
