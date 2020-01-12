@@ -36,6 +36,15 @@
 #define HRAM_START_ADDR	0xFF80
 #define HRAM_STOP_ADDR	0xFFFE
 
+#include <signal.h>
+
+static volatile int keepRunning = 1;
+
+void intHandler(int dummy) {
+	keepRunning = 0;
+}
+
+
 enum gbs_instr_e {
 	GBS_SET_VAL = 0,
 	GBS_RET,
@@ -53,11 +62,12 @@ enum gbs_instr_e {
  * 10nn nnnn 0aaa aaaa vvvv vvvv vvvv vvvv ...
  *
  * GOTO Goto memory pointed to in slot m. Instructions at slot m must end with
- * 	RET. Calling a memory slot that doesn't exist is undefined.
+ * 	BEAT. Calling a memory slot that doesn't exist is undefined.
  * 1100 mmmm
  *
- * RET	Returns from code; wait until timer interrupt before continuing.
- * 1101 xxxx
+ * BEAT	Returns from instructions setting musical beat and skips n number of
+ *	beats.
+ * 1101 nnnn
  *
  * Rejected:
  * STOR	Store the next instruction in memory slot m.
@@ -1124,33 +1134,12 @@ int main(int argc, char **argv)
 	/* Fixes printf's not printing to stdout until exit in Windows. */
 	setbuf(stdout, NULL);
 
-	fprintf(stdout, "Keys: q = Quit, n = Next, p = Previous\n");
+	signal(SIGINT, intHandler);
 
-	while (1) {
-		switch (getchar()) {
-		case 'q':
-			goto out;
+	puts("CTRL+C or SIGINT to exit.");
 
-		case 'n':
-			if (song_no < h.song_count - 1U) {
-				regs.a  = ++song_no;
-				regs.sp = h.sp - 2;
-				regs.pc = h.init_addr;
-				fprintf(stdout, "Song %d of %d\n", song_no,
-					h.song_count - 1U);
-			}
-			break;
-
-		case 'p':
-			if (song_no > 0) {
-				regs.a  = --song_no;
-				regs.sp = h.sp - 2;
-				regs.pc = h.init_addr;
-				fprintf(stdout, "Song %d of %d\n", song_no,
-					h.song_count - 1U);
-			}
-			break;
-		}
+	while (keepRunning)
+	{
 #if defined(AUDIO_DRIVER_NONE)
 		audio_callback(NULL, (uint8_t *)samples, AUDIO_SAMPLE_RATE * sizeof(float));
 #endif
