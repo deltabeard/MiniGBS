@@ -254,7 +254,7 @@ static void record_gbs_instr(const enum gbs_instr_e instr, const uint16_t addr,
 		break;
 
 	case GBS_RET:
-		pgbs_bin[pgbs_bin_sz] |= 1UL << 7;
+		pgbs_bin[pgbs_bin_sz] = 0b11010000;
 		pgbs_bin_sz += 1;
 
 		strcat(instr_txt, "RET\n");
