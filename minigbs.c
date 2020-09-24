@@ -1145,7 +1145,13 @@ argv[0]);
 
 	puts("CTRL+C or SIGINT to exit.");
 
-	while (keepRunning && (play_time == 0 || sec < play_time))
+	while (keepRunning && (play_time == 0
+#if defined(AUDIO_DRIVER_NONE)
+				|| sec < play_time)
+#else
+	     		)
+#endif
+			)
 	{
 #if defined(AUDIO_DRIVER_NONE)
 		audio_callback(NULL, (uint8_t *)samples, AUDIO_SAMPLE_RATE *

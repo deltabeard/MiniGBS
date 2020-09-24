@@ -1,5 +1,4 @@
 CC := cc
-OPTIMIZE_FLAG ?= -Og -g3 -fsanitize=address -fsanitize=undefined
 CFLAGS := -Wall -Wextra $(OPTIMIZE_FLAG)
 LDLIBS := -lm
 
