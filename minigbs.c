@@ -11,11 +11,6 @@
 #include <SDL2/SDL.h>
 #endif
 
-#ifdef AUDIO_DRIVER_SOKOL
-#define SOKOL_IMPL
-#include "sokol_audio.h"
-#endif
-
 #ifdef AUDIO_DRIVER_MINIAUDIO
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
@@ -676,13 +671,6 @@ void process_cpu(void)
 	regs.sp -= 2;
 }
 
-#ifdef AUDIO_DRIVER_SOKOL
-void sokol_audio_callback(float* buffer, int num_frames, int num_channels)
-{
-	audio_callback(NULL, (uint8_t *)buffer, num_frames * num_channels * sizeof(float));
-}
-#endif
-
 #ifdef AUDIO_DRIVER_MINIAUDIO
 void miniaudio_callback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 frameCount)
 {
@@ -848,17 +836,6 @@ int main(int argc, char **argv)
 		/* Begin playing audio. */
 		SDL_PauseAudioDevice(audio, 0);
 	}
-#elif defined(AUDIO_DRIVER_SOKOL)
-	/* Initialise SOKOL Audio. */
-	{
-		const saudio_desc sd = {
-			.stream_cb = sokol_audio_callback,
-			.sample_rate = AUDIO_SAMPLE_RATE,
-			.num_channels = 2
-
-		};
-		saudio_setup(&sd);
-	}
 #elif defined(AUDIO_DRIVER_MINIAUDIO)
 	ma_device_config conf = ma_device_config_init(ma_device_type_playback);
 	ma_device device;
@@ -919,8 +896,6 @@ int main(int argc, char **argv)
 out:
 #if defined(AUDIO_DRIVER_SDL)
 	SDL_Quit();
-#elif defined(AUDIO_DRIVER_SOKOL)
-	saudio_shutdown();
 #elif defined(AUDIO_DRIVER_MINIAUDIO)
 	ma_device_uninit(&device);
 #elif defined(AUDIO_DRIVER_NONE)

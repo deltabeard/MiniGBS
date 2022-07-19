@@ -27,15 +27,6 @@ else ifeq ($(AUDIO_LIB), MINIAUDIO)
 		LDLIBS += -lpthread -ldl
 	endif
 
-else ifeq ($(AUDIO_LIB),SOKOL)
-	CFLAGS += -DAUDIO_DRIVER_SOKOL
-
-	ifeq ($(OS),Windows_NT)
-		LDLIBS += -lkernel32 -lole32
-	else
-		LDLIBS += -lasound -lpthread
-	endif
-
 else ifeq ($(AUDIO_LIB),NONE)
 	CFLAGS += -DAUDIO_DRIVER_NONE
 
@@ -48,7 +39,7 @@ endif
 all: audio_lib_check minigbs
 minigbs: minigbs.o audio.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
-minigbs.o: minigbs.c minigbs.h audio.h sokol_audio.h
+minigbs.o: minigbs.c minigbs.h audio.h
 audio.o: audio.c audio.h minigbs.h
 
 audio_lib_check:
@@ -59,8 +50,8 @@ clean:
 	rm -f minigbs minigbs.o audio.o
 help:
 	@echo Options:
-	@echo \ \ AUDIO_LIB=\[SDL2\|MINIAUDIO\|SOKOL\|NONE\]
-	@echo \ \ \ \ Use SDL2, MINIAUDIO, SOKOL or NONE for output audio library.
+	@echo \ \ AUDIO_LIB=\[SDL2\|MINIAUDIO\|NONE\]
+	@echo \ \ \ \ Use SDL2, MINIAUDIO, or NONE for output audio library.
 	@echo \ \ \ \ NONE will disable audio\; useful for debugging.
 	@echo \ \ \ \ MINIAUDIO is default on Windows, other platforms use SDL2 by default.
 	@echo
