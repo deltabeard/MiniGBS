@@ -21,8 +21,7 @@ ifeq ($(AUDIO_LIB), SDL2)
 	LDLIBS += $(shell sdl2-config --libs)
 
 else ifeq ($(AUDIO_LIB), MINIAUDIO)
-	CFLAGS += -DAUDIO_DRIVER_MINIAUDIO -DMA_NO_ENCODING -DMA_NO_ENCODING \
-		  -DMA_NO_WAV -DMA_NO_FLAC -DMA_NO_MP3
+	CFLAGS += -DAUDIO_DRIVER_MINIAUDIO
 	ifneq ($(OS), Windows_NT)
 		LDLIBS += -lpthread -ldl
 	endif
