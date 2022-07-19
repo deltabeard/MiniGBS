@@ -1,5 +1,4 @@
-#include "minigbs.h"
-#include "audio.h"
+#include "minigb_apu.h"
 #include <errno.h>
 #include <math.h>
 #include <stdint.h>
@@ -668,7 +667,7 @@ static void cpu_step(void)
 end:;
 }
 
-void process_cpu(void)
+static void process_cpu(void)
 {
 	while (regs.sp != h.sp)
 		cpu_step();
@@ -685,7 +684,15 @@ void miniaudio_callback(ma_device *pDevice, void *pOutput, const void *pInput, m
 	(void) pDevice;
 	(void) pInput;
 
-	audio_callback(NULL, pOutput, frameCount * channels * sizeof(float));
+	process_cpu();
+	audio_callback(NULL, pOutput, frameCount * channels);
+}
+#endif
+#ifdef AUDIO_DRIVER_SDL2
+void sdl2_audio_callback(void *userdata, uint8_t *stream, int len)
+{
+	process_cpu();
+	audio_callback(void *userdata, uint8_t *stream, int len);
 }
 #endif
 
@@ -820,9 +827,9 @@ int main(int argc, char **argv)
 		SDL_AudioSpec     want = {
 			    .freq     = AUDIO_SAMPLE_RATE,
 			    .channels = 2,
-			    .samples  = AUDIO_SAMPLE_RATE / 12U,
-			    .format   = AUDIO_F32SYS,
-			    .callback = audio_callback,
+			    .samples  = AUDIO_SAMPLE_RATE,
+			    .format   = AUDIO_S16SYS,
+			    .callback = sdl2_audio_callback,
 		};
 
 		if (SDL_Init(SDL_INIT_AUDIO) != 0) {
@@ -845,10 +852,11 @@ int main(int argc, char **argv)
 #elif defined(AUDIO_DRIVER_MINIAUDIO)
 	ma_device_config conf = ma_device_config_init(ma_device_type_playback);
 	ma_device device;
-	conf.playback.format = ma_format_f32;
+	conf.playback.format = ma_format_s16;
 	conf.playback.channels = 2;
 	conf.sampleRate = AUDIO_SAMPLE_RATE;
 	conf.dataCallback = miniaudio_callback;
+	conf.periodSizeInFrames = AUDIO_SAMPLES;
 
 	{
 		if(ma_device_init(NULL,&conf, &device) != MA_SUCCESS){
@@ -859,7 +867,7 @@ int main(int argc, char **argv)
 		ma_device_start(&device);
 	}
 #elif defined(AUDIO_DRIVER_NONE)
-	float *samples = malloc(AUDIO_SAMPLE_RATE * sizeof(float));
+	uint16_t *samples = malloc(AUDIO_SAMPLE_RATE * sizeof(uint16_t));
 #else
 #error "No audio driver defined."
 #endif
@@ -895,7 +903,7 @@ int main(int argc, char **argv)
 			break;
 		}
 #if defined(AUDIO_DRIVER_NONE)
-		audio_callback(NULL, (uint8_t *)samples, AUDIO_SAMPLE_RATE * sizeof(float));
+		audio_callback(NULL, (uint8_t *)samples, AUDIO_SAMPLE_RATE * sizeof(uint16_t));
 #endif
 	}
 
@@ -907,8 +915,6 @@ out:
 #elif defined(AUDIO_DRIVER_NONE)
 	free(samples);
 #endif
-
-	audio_deinit();
 
 	do {
 		free(banks[bno]);

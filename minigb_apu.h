@@ -1,6 +1,21 @@
+/**
+ * minigb_apu is released under the terms listed within the LICENSE file.
+ *
+ * minigb_apu emulates the audio processing unit (APU) of the Game Boy. This
+ * project is based on MiniGBS by Alex Baines: https://github.com/baines/MiniGBS
+ */
+
+#pragma once
+
 #include <stdint.h>
 
-#define AUDIO_SAMPLE_RATE 48000.0f
+#define AUDIO_SAMPLE_RATE	48000
+
+#define DMG_CLOCK_FREQ		4194304.0
+#define SCREEN_REFRESH_CYCLES	70224.0
+#define VERTICAL_SYNC		(DMG_CLOCK_FREQ/SCREEN_REFRESH_CYCLES)
+
+#define AUDIO_SAMPLES		((unsigned)(AUDIO_SAMPLE_RATE / VERTICAL_SYNC))
 
 /**
  * Fill allocated buffer "data" with "len" number of 32-bit floating point
@@ -22,8 +37,3 @@ void audio_write(const uint16_t addr, const uint8_t val);
  * Initialise audio driver.
  */
 void audio_init(void);
-
-/**
- * Frees memory used by audio driver.
- */
-void audio_deinit(void);

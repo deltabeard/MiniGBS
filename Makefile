@@ -36,17 +36,17 @@ else
 endif
 
 all: audio_lib_check minigbs
-minigbs: minigbs.o audio.o
+minigbs: minigbs.o minigb_apu.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
-minigbs.o: minigbs.c minigbs.h audio.h
-audio.o: audio.c audio.h minigbs.h
+minigbs.o: minigbs.c minigb_apu.h
+minigb_apu.o: minigb_apu.c minigb_apu.h
 
 audio_lib_check:
 ifdef AUDIO_LIB_FAILURE
 	$(error The audio library "$(AUDIO_LIB)" is not supported)
 endif
 clean:
-	rm -f minigbs minigbs.o audio.o
+	rm -f minigbs minigbs.o minigb_apu.o
 help:
 	@echo Options:
 	@echo \ \ AUDIO_LIB=\[SDL2\|MINIAUDIO\|NONE\]
