@@ -216,7 +216,7 @@ static void record_gbs_instr(const enum gbs_instr_e instr, const uint16_t addr,
 	assert(pgbs_bin != NULL);
 	assert(instr_txt != NULL);
 
-	static char instr_str[32];
+	static char instr_str[64];
 
 	// TODO: decide best way to organise addresses for faster channel
 	// selection, instead of division by 5.
@@ -247,7 +247,8 @@ static void record_gbs_instr(const enum gbs_instr_e instr, const uint16_t addr,
 		pgbs_bin[pgbs_bin_sz + 1] = val;
 		pgbs_bin_sz += 2;
 
-		sprintf(instr_str, "SET %#06x %#04x\n", addr, val);
+		//sprintf(instr_str, "SET %#06x %#04x\n", addr, val);
+		sprintf(instr_str, "{ AUDIO_CMD_SET_REGISTER,\t%#06x, %#04x },\n", addr, val);
 		strcat(instr_txt, instr_str);
 		instr_txt_sz += strlen(instr_str);
 
@@ -257,8 +258,8 @@ static void record_gbs_instr(const enum gbs_instr_e instr, const uint16_t addr,
 		pgbs_bin[pgbs_bin_sz] = 0b11010000;
 		pgbs_bin_sz += 1;
 
-		strcat(instr_txt, "RET\n");
-		instr_txt_sz += 4;
+		strcat(instr_txt, "{ AUDIO_CMD_END_FRAME,\t0x0000, 0x00 },\n");
+		instr_txt_sz += strlen(instr_str);
 
 		break;
 
