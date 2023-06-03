@@ -1,5 +1,5 @@
 CC := cc
-OPT := -s -Ofast
+OPT := -s -O2
 
 # Required build flags.
 CFLAGS += -Wall -Wextra $(OPT)
