@@ -685,7 +685,7 @@ void miniaudio_callback(ma_device *pDevice, void *pOutput, const void *pInput, m
 	(void) pInput;
 
 	process_cpu();
-	audio_callback(NULL, pOutput, frameCount * channels);
+	audio_callback(NULL, pOutput, frameCount * channels * sizeof(int16_t));
 }
 #endif
 #ifdef AUDIO_DRIVER_SDL2
