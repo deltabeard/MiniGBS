@@ -13,7 +13,7 @@
 #include "minigb_apu.h"
 
 #define DMG_CLOCK_FREQ_U	((unsigned)DMG_CLOCK_FREQ)
-#define AUDIO_NSAMPLES		(AUDIO_SAMPLES * 2u)
+#define AUDIO_NSAMPLES		(AUDIO_SAMPLES_TOTAL)
 
 #define AUDIO_MEM_SIZE		(0xFF3F - 0xFF10 + 1)
 #define AUDIO_ADDR_COMPENSATION	0xFF10
@@ -366,15 +366,15 @@ static void update_noise(int16_t *samples)
 /**
  * SDL2 style audio callback function.
  */
-void audio_callback(void *userdata, uint8_t *stream, int len)
+void audio_callback(void *userdata, void *stream, int sz)
 {
-	int16_t *samples = (int16_t *)stream;
+	int16_t *samples = stream;
+	assert(sz == (AUDIO_SAMPLES * 2 * sizeof(int16_t)));
 
-	/* Appease unused variable warning. */
-	(void)userdata;
+	/* userdata is unused and only here for ease of use with SDL2. */
+	(void) userdata;
 
-	memset(stream, 0, len);
-	
+	memset(samples, 0, sz);
 	update_square(samples, 0);
 	update_square(samples, 1);
 	update_wave(samples);
