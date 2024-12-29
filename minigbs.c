@@ -689,11 +689,11 @@ void miniaudio_callback(ma_device *pDevice, void *pOutput, const void *pInput, m
 	audio_callback(&ctx, pOutput);
 }
 #endif
-#ifdef AUDIO_DRIVER_SDL2
+#if defined(AUDIO_DRIVER_SDL)
 void sdl2_audio_callback(void *userdata, uint8_t *stream, int len)
 {
 	process_cpu();
-	audio_callback(void *userdata, uint8_t *stream, int len);
+	audio_callback(&ctx, (void *)stream);
 }
 #endif
 
@@ -828,7 +828,7 @@ int main(int argc, char **argv)
 		SDL_AudioSpec     want = {
 			    .freq     = AUDIO_SAMPLE_RATE,
 			    .channels = 2,
-			    .samples  = AUDIO_SAMPLE_RATE,
+			    .samples  = AUDIO_SAMPLES,
 			    .format   = AUDIO_S16SYS,
 			    .callback = sdl2_audio_callback,
 		};
