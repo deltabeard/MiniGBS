@@ -2,7 +2,7 @@ CC := cc
 OPT := -s -O2
 
 # Required build flags.
-CFLAGS += -Wall -Wextra $(OPT)
+CFLAGS += -Wall -Wextra -DAUDIO_SAMPLE_RATE=48000 $(OPT)
 LDLIBS += -lm
 
 ifndef AUDIO_LIB

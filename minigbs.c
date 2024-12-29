@@ -92,6 +92,7 @@ uint8_t *hram;
 static struct GBSHeader h;
 static uint8_t *	banks[32];
 static uint8_t *	selected_rom_bank;
+struct minigb_apu_ctx ctx;
 
 static void bank_switch(const uint8_t which)
 {
@@ -104,7 +105,7 @@ static void mem_write(const uint16_t addr, const uint8_t val)
 {
 	/* Call audio_write when writing to audio registers. */
 	if (addr >= 0xFF06 && addr <= 0xFF3F)
-		audio_write(addr, val);
+		audio_write(&ctx, addr, val);
 	/* Switch ROM banks. */
 	else if (addr >= 0x2000 && addr < ROM_BANK1_ADDR)
 		bank_switch(val);
@@ -128,7 +129,7 @@ static uint8_t mem_read(const uint16_t addr)
 		return mem[addr - RAM_START_ADDR];
 	/* Read Audio registers. */
 	else if (addr >= 0xFF06 && addr <= 0xFF3F)
-		return audio_read(addr);
+		return audio_read(&ctx, addr);
 	else if (addr >= HRAM_START_ADDR && addr <= HRAM_STOP_ADDR)
 		return hram[addr - HRAM_START_ADDR];
 
@@ -685,7 +686,7 @@ void miniaudio_callback(ma_device *pDevice, void *pOutput, const void *pInput, m
 	(void) pInput;
 
 	process_cpu();
-	audio_callback(NULL, pOutput, frameCount * channels * sizeof(int16_t));
+	audio_callback(&ctx, pOutput);
 }
 #endif
 #ifdef AUDIO_DRIVER_SDL2
@@ -813,11 +814,11 @@ int main(int argc, char **argv)
 	/* TODO: Check if removing this breaks anything. */
 	//mem[0xffff] = 1; // IE
 
-	/* Load timer values from file. */
-	audio_write(0xff06, h.tma);
-	audio_write(0xff07, h.tac);
+	audio_init(&ctx);
 
-	audio_init();
+	/* Load timer values from file. */
+	audio_write(&ctx, 0xff06, h.tma);
+	audio_write(&ctx, 0xff07, h.tac);
 
 #if defined(AUDIO_DRIVER_SDL)
 	/* Initialise SDL audio. */
