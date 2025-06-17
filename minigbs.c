@@ -5,6 +5,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
+#include <signal.h>
+#include <time.h>
+#include <unistd.h>
+#ifdef _WIN32
+#include <conio.h>
+#else
+#include <termios.h>
+#include <fcntl.h>
+#endif
 
 #ifdef AUDIO_DRIVER_SDL
 #include <SDL2/SDL.h>
@@ -93,6 +103,36 @@ static struct GBSHeader h;
 static uint8_t *	banks[32];
 static uint8_t *	selected_rom_bank;
 struct minigb_apu_ctx ctx;
+
+enum playlist_type { PL_TRACK, PL_JUMP };
+
+struct playlist_entry {
+        enum playlist_type type;
+        size_t line_no;
+        union {
+                struct {
+                        uint16_t track;
+                        uint32_t duration;
+                } track;
+                struct {
+                        uint16_t line;
+                        int16_t  count;
+                        int16_t  executed;
+                } jump;
+        } data;
+};
+
+static struct playlist_entry *playlist;
+static size_t                playlist_len;
+
+static volatile sig_atomic_t stop_flag;
+static volatile sig_atomic_t next_flag;
+
+static void sigint_handler(int sig)
+{
+        (void)sig;
+        stop_flag = 1;
+}
 
 static void bank_switch(const uint8_t which)
 {
@@ -670,20 +710,191 @@ end:;
 
 static void process_cpu(void)
 {
-	while (regs.sp != h.sp)
-		cpu_step();
+        while (regs.sp != h.sp)
+                cpu_step();
 
-	regs.pc = h.play_addr;
-	regs.sp -= 2;
+        regs.pc = h.play_addr;
+        regs.sp -= 2;
+}
+
+#ifndef _WIN32
+static struct termios old_term;
+static void restore_terminal(void)
+{
+        tcsetattr(STDIN_FILENO, TCSANOW, &old_term);
+        int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+        fcntl(STDIN_FILENO, F_SETFL, flags & ~O_NONBLOCK);
+}
+
+static void setup_terminal(void)
+{
+        struct termios new_term;
+        tcgetattr(STDIN_FILENO, &old_term);
+        new_term = old_term;
+        new_term.c_lflag &= ~(ICANON | ECHO);
+        tcsetattr(STDIN_FILENO, TCSANOW, &new_term);
+        int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+        fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
+        atexit(restore_terminal);
+}
+#else
+static void setup_terminal(void) {}
+static void restore_terminal(void) {}
+#endif
+
+static int poll_key(void)
+{
+#ifdef _WIN32
+        if (_kbhit())
+                return _getch();
+        return -1;
+#else
+        int c = getchar();
+        if (c != EOF)
+                return c;
+        return -1;
+#endif
+}
+
+static size_t find_line(size_t line)
+{
+        for (size_t i = 0; i < playlist_len; ++i)
+                if (playlist[i].line_no >= line)
+                        return i;
+        return playlist_len;
+}
+
+static void wait_seconds(uint32_t seconds)
+{
+        struct timespec start, now;
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        while (!stop_flag) {
+                clock_gettime(CLOCK_MONOTONIC, &now);
+                if ((uint32_t)(now.tv_sec - start.tv_sec) >= seconds)
+                        break;
+                int c = poll_key();
+                if (c == 'q') {
+                        stop_flag = 1;
+                        break;
+                }
+                if (c == 'n') {
+                        next_flag = 1;
+                        break;
+                }
+        }
+}
+
+static int parse_playlist(const char *path)
+{
+        FILE *pf = fopen(path, "r");
+        if (!pf) {
+                fprintf(stderr, "Error opening playlist file: %s\n",
+                        strerror(errno));
+                return -1;
+        }
+
+        char   line[256];
+        size_t line_no = 0;
+        size_t cap     = 0;
+
+        while (fgets(line, sizeof(line), pf)) {
+                char *p;
+                line_no++;
+                for (p = line; isspace((unsigned char)*p); ++p)
+                        ;
+                if (*p == '#' || *p == '\0' || *p == '\n')
+                        continue;
+                if (playlist_len >= cap) {
+                        cap = cap ? cap * 2 : 16;
+                        struct playlist_entry *tmp =
+                                realloc(playlist, cap * sizeof(*playlist));
+                        if (!tmp) {
+                                fclose(pf);
+                                fprintf(stderr, "Out of memory parsing playlist\n");
+                                return -1;
+                        }
+                        playlist = tmp;
+                }
+
+                if (*p == 'T') {
+                        unsigned int t;
+                        unsigned long d;
+                        if (sscanf(p + 1, "%u,%lu", &t, &d) != 2) {
+                                fprintf(stderr,
+                                        "Invalid track entry at line %zu\n",
+                                        line_no);
+                                continue;
+                        }
+                        playlist[playlist_len].type          = PL_TRACK;
+                        playlist[playlist_len].line_no       = line_no;
+                        playlist[playlist_len].data.track.track = (uint16_t)t;
+                        playlist[playlist_len].data.track.duration = (uint32_t)d;
+                        playlist_len++;
+                } else if (*p == 'J') {
+                        unsigned int l;
+                        int          c;
+                        if (sscanf(p + 1, "%u,%d", &l, &c) != 2) {
+                                fprintf(stderr,
+                                        "Invalid jump entry at line %zu\n",
+                                        line_no);
+                                continue;
+                        }
+                        playlist[playlist_len].type           = PL_JUMP;
+                        playlist[playlist_len].line_no        = line_no;
+                        playlist[playlist_len].data.jump.line = (uint16_t)l;
+                        playlist[playlist_len].data.jump.count = (int16_t)c;
+                        playlist[playlist_len].data.jump.executed = 0;
+                        playlist_len++;
+                } else {
+                        fprintf(stderr, "Unknown instruction at line %zu\n",
+                                line_no);
+                }
+        }
+
+        fclose(pf);
+        return 0;
+}
+
+static void run_playlist(void)
+{
+        size_t idx = 0;
+        while (idx < playlist_len && !stop_flag) {
+                struct playlist_entry *e = &playlist[idx];
+                if (e->type == PL_TRACK) {
+                        if (e->data.track.track >= h.song_count)
+                                fprintf(stderr,
+                                        "Warning: track %u out of range\n",
+                                        e->data.track.track);
+                        regs.a = e->data.track.track;
+                        regs.sp = h.sp - 2;
+                        regs.pc = h.init_addr;
+                        fprintf(stdout, "Song %u for %u seconds\n",
+                                e->data.track.track, e->data.track.duration);
+                        wait_seconds(e->data.track.duration);
+                        idx++;
+                        if (next_flag) {
+                                next_flag = 0;
+                                continue;
+                        }
+                } else {
+                        if (e->data.jump.count == -1 ||
+                            e->data.jump.executed < e->data.jump.count) {
+                                if (e->data.jump.count != -1)
+                                        e->data.jump.executed++;
+                                idx = find_line(e->data.jump.line);
+                        } else {
+                                idx++;
+                        }
+                }
+        }
 }
 
 #ifdef AUDIO_DRIVER_MINIAUDIO
 void miniaudio_callback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 frameCount)
 {
-	const uint_least8_t channels = 2;
-
-	(void) pDevice;
-	(void) pInput;
+        (void) pDevice;
+        (void) pInput;
+        (void) frameCount;
 
 	process_cpu();
 	audio_callback(&ctx, pOutput);
@@ -699,15 +910,35 @@ void sdl2_audio_callback(void *userdata, uint8_t *stream, int len)
 
 int main(int argc, char **argv)
 {
-	FILE *f;
-	uint_least8_t song_no;
+        FILE *f;
+        uint_least8_t song_no = 0;
+        const char *playlist_path = NULL;
+        const char *song_arg      = NULL;
+        const char *file_path     = NULL;
 
-	if (argc != 2 && argc != 3) {
-		fprintf(stderr, "Usage: %s file [song index]\n", argv[0]);
-		exit(EXIT_FAILURE);
-	}
+        for (int i = 1; i < argc; ++i) {
+                if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
+                        playlist_path = argv[++i];
+                } else if (!file_path) {
+                        file_path = argv[i];
+                } else if (!song_arg) {
+                        song_arg = argv[i];
+                } else {
+                        fprintf(stderr,
+                                "Usage: %s file [song index] [-p playlist]\n",
+                                argv[0]);
+                        exit(EXIT_FAILURE);
+                }
+        }
 
-	f = fopen(argv[1], "rb");
+        if (!file_path) {
+                fprintf(stderr,
+                        "Usage: %s file [song index] [-p playlist]\n",
+                        argv[0]);
+                exit(EXIT_FAILURE);
+        }
+
+        f = fopen(file_path, "rb");
 	if (!f) {
 		fprintf(stderr, "Error opening file: %s\n", strerror(errno));
 		exit(EXIT_FAILURE);
@@ -723,13 +954,21 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	if (h.version != 1) {
-		fprintf(stderr, "Error: Only GBS version 1 is supported.\n");
-		exit(EXIT_FAILURE);
-	}
+        if (h.version != 1) {
+                fprintf(stderr, "Error: Only GBS version 1 is supported.\n");
+                exit(EXIT_FAILURE);
+        }
 
-	/* Get user selected song number to begin playing. */
-	song_no = argc > 2 ? atoi(argv[2]) : MAX(0, h.start_song - 1);
+        if (playlist_path && parse_playlist(playlist_path) != 0)
+                return EXIT_FAILURE;
+
+        if (playlist_path)
+                setup_terminal();
+
+        signal(SIGINT, sigint_handler);
+
+        /* Get user selected song number to begin playing. */
+        song_no = song_arg ? atoi(song_arg) : MAX(0, h.start_song - 1);
 
 	/* Check that user selected song number is within range of the number of
 	 * songs available in input GBS file. */
@@ -773,7 +1012,8 @@ int main(int argc, char **argv)
 		}
 
 		banks[bno] = page;
-		fread(page + off, 1, ROM_BANK_SIZE - off, f);
+                size_t rb = fread(page + off, 1, ROM_BANK_SIZE - off, f);
+                (void)rb;
 
 		if (feof(f))
 			break;
@@ -873,39 +1113,43 @@ int main(int argc, char **argv)
 #error "No audio driver defined."
 #endif
 
-	fprintf(stdout, "Keys: q = Quit, n = Next, p = Previous\n");
+        if (playlist_path) {
+                run_playlist();
+        } else {
+                fprintf(stdout, "Keys: q = Quit, n = Next, p = Previous\n");
+                while (!stop_flag) {
+                        switch (getchar()) {
+                        case 'q':
+                                stop_flag = 1;
+                                break;
 
-	while (1) {
-		switch (getchar()) {
-		case 'q':
-			goto out;
+                        case 'n':
+                                if (song_no < h.song_count - 1U) {
+                                        regs.a  = ++song_no;
+                                        regs.sp = h.sp - 2;
+                                        regs.pc = h.init_addr;
+                                        fprintf(stdout, "Song %d of %d\n", song_no,
+                                                h.song_count - 1U);
+                                }
+                                break;
 
-		case 'n':
-			if (song_no < h.song_count - 1U) {
-				regs.a  = ++song_no;
-				regs.sp = h.sp - 2;
-				regs.pc = h.init_addr;
-				fprintf(stdout, "Song %d of %d\n", song_no,
-					h.song_count - 1U);
-			}
-			break;
-
-		case 'p':
-			if (song_no > 0) {
-				regs.a  = --song_no;
-				regs.sp = h.sp - 2;
-				regs.pc = h.init_addr;
-				fprintf(stdout, "Song %d of %d\n", song_no,
-					h.song_count - 1U);
-			}
-			break;
-		}
+                        case 'p':
+                                if (song_no > 0) {
+                                        regs.a  = --song_no;
+                                        regs.sp = h.sp - 2;
+                                        regs.pc = h.init_addr;
+                                        fprintf(stdout, "Song %d of %d\n", song_no,
+                                                h.song_count - 1U);
+                                }
+                                break;
+                        }
 #if defined(AUDIO_DRIVER_NONE)
-		audio_callback(NULL, (uint8_t *)samples, AUDIO_SAMPLE_RATE * sizeof(uint16_t));
+                        audio_callback(NULL, (uint8_t *)samples,
+                                      AUDIO_SAMPLE_RATE * sizeof(uint16_t));
 #endif
-	}
+                }
+        }
 
-out:
 #if defined(AUDIO_DRIVER_SDL)
 	SDL_Quit();
 #elif defined(AUDIO_DRIVER_MINIAUDIO)
@@ -918,8 +1162,12 @@ out:
 		free(banks[bno]);
 	} while(bno--);
 
-	free(mem);
-	free(hram);
+        if (playlist_path)
+                restore_terminal();
 
-	return EXIT_SUCCESS;
+        free(mem);
+        free(hram);
+        free(playlist);
+
+        return EXIT_SUCCESS;
 }
