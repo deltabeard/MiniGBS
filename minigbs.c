@@ -873,9 +873,6 @@ int main(int argc, char **argv)
 #error "No audio driver defined."
 #endif
 
-	/* Fixes printf's not printing to stdout until exit in Windows. */
-	setbuf(stdout, NULL);
-
 	fprintf(stdout, "Keys: q = Quit, n = Next, p = Previous\n");
 
 	while (1) {
